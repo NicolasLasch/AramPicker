@@ -1,4 +1,10 @@
-const socket = io();
+const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const socketUrl = isDevelopment ? 'http://localhost:3000' : window.location.origin;
+const socket = io(socketUrl, {
+    transports: ['websocket', 'polling'],
+    upgrade: true,
+    rememberUpgrade: true
+});
 
 // Store game state in sessionStorage to persist across page reloads
 function saveGameSession() {

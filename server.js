@@ -13,7 +13,6 @@ try {
     process.exit(1);
 }
 
-// Test if champions.json exists
 const championsPath = path.join(__dirname, 'game', 'champions.json');
 if (!fs.existsSync(championsPath)) {
     console.error('champions.json not found at:', championsPath);
@@ -37,14 +36,28 @@ if (!fs.existsSync(championsPath)) {
 
 const app = express();
 const server = http.createServer(app);
+
+const isDevelopment = !process.env.RENDER_EXTERNAL_URL;
+const allowedOrigins = isDevelopment 
+    ? ["http://localhost:3000", "http://127.0.0.1:3000"]
+    : [process.env.RENDER_EXTERNAL_URL];
+
+console.log('Environment:', isDevelopment ? 'Development' : 'Production');
+console.log('Allowed origins:', allowedOrigins);
+
 const io = socketIo(server, {
     cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
+        origin: allowedOrigins,
+        methods: ["GET", "POST"],
+        credentials: true
     }
 });
 
-app.use(cors());
+app.use(cors({
+    origin: allowedOrigins,
+    credentials: true
+}));
+
 app.use(express.static('public'));
 
 const gameRooms = new Map();
@@ -70,7 +83,6 @@ function createRoom(hostSocket, playerName) {
     gameRooms.set(roomCode, room);
     hostSocket.join(roomCode);
     
-    // Add the host player to the room
     room.addPlayer(hostSocket.id, playerName, hostSocket);
     console.log(`Host player ${playerName} added to room ${roomCode}`);
     
@@ -99,7 +111,7 @@ function sendPersonalizedGameEnd(room) {
     room.players.forEach((player, playerId) => {
         const playerSocket = player.socket;
         if (playerSocket) {
-            playerSocket.emit('gameEnded', room.getGameState()); // Show all champions at end
+            playerSocket.emit('gameEnded', room.getGameState());
         }
     });
 }
@@ -168,7 +180,6 @@ io.on('connection', (socket) => {
                 gameState: room.getGameStateForPlayer(socket.id)
             });
 
-            // Send personalized updates to each player
             room.players.forEach((player, playerId) => {
                 const playerSocket = player.socket;
                 if (playerSocket) {
@@ -191,7 +202,6 @@ io.on('connection', (socket) => {
             return;
         }
 
-        // Find if player was already in the room
         let existingPlayer = null;
         let oldPlayerId = null;
         for (const [playerId, player] of room.players) {
@@ -210,13 +220,11 @@ io.on('connection', (socket) => {
         try {
             socket.join(roomCode);
             
-            // Update the socket ID and socket reference
             room.players.delete(oldPlayerId);
             room.players.set(socket.id, existingPlayer);
             existingPlayer.socketId = socket.id;
             existingPlayer.socket = socket;
             
-            // Check if this player was the host (compare by name since socket ID changed)
             const isHost = room.hostId === oldPlayerId;
             if (isHost) {
                 room.hostId = socket.id;
@@ -385,7 +393,6 @@ io.on('connection', (socket) => {
     });
 });
 
-// Cleanup empty rooms every 5 minutes
 setInterval(() => {
     for (const [roomCode, room] of gameRooms.entries()) {
         if (room.players.size === 0) {
@@ -395,7 +402,11 @@ setInterval(() => {
 }, 300000);
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
-    console.log(`Visit http://localhost:${PORT} to play!`);
+    if (process.env.RENDER_EXTERNAL_URL) {
+        console.log(`Visit ${process.env.RENDER_EXTERNAL_URL} to play!`);
+    } else {
+        console.log(`Visit http://localhost:${PORT} to play!`);
+    }
 });
