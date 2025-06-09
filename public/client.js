@@ -206,6 +206,54 @@ function setupSocketListeners() {
     socket.on('error', (message) => {
         showError(message);
     });
+
+    socket.on('riotAccountLinked', (data) => {
+        const statusDiv = document.getElementById('linkingStatus');
+        
+        if (data.success) {
+            console.log('Riot account linked successfully:', data.championPool);
+            
+            statusDiv.innerHTML = `<span style="color: #5cb85c;">✅ ${data.message}</span>`;
+            
+            const pendingAction = gameState.pendingAction;
+            
+            setTimeout(() => {
+                document.querySelector('.riot-account-modal').remove();
+                
+                // Use Riot summoner name, with fallbacks
+                let playerName = data.championPool?.summonerName;
+                
+                // Fallback chain if summonerName is undefined
+                if (!playerName || playerName === 'undefined') {
+                    const riotId = document.getElementById('riotId').value.trim();
+                    const [gameName] = riotId.split('#');
+                    playerName = gameName || pendingAction.playerName;
+                }
+                
+                console.log(`Using player name: ${playerName}`);
+                console.log(`Champion pool size: ${data.championPool?.championIds?.length || 0}`);
+                
+                if (pendingAction.action === 'create') {
+                    socket.emit('createRoom', { 
+                        playerName: playerName,
+                        championPool: data.championPool?.championIds || []
+                    });
+                } else {
+                    socket.emit('joinRoom', { 
+                        roomCode: pendingAction.roomCode,
+                        playerName: playerName,
+                        championPool: data.championPool?.championIds || []
+                    });
+                }
+                
+                // Clear pending action
+                gameState.pendingAction = null;
+            }, 1500);
+            
+        } else {
+            statusDiv.innerHTML = `<span style="color: #d9534f;">❌ ${data.error}</span>`;
+        }
+    });
 }
 
 function createGame() {
@@ -215,8 +263,8 @@ function createGame() {
         return;
     }
     
-    gameState.playerName = name;
-    socket.emit('createRoom', name);
+    // Show Riot linking modal with create room context
+    showRiotAccountLinking('create', name);
 }
 
 function joinGame() {
@@ -228,8 +276,8 @@ function joinGame() {
         return;
     }
     
-    gameState.playerName = name;
-    socket.emit('joinRoom', { roomCode: code, playerName: name });
+    // Show Riot linking modal with join room context
+    showRiotAccountLinking('join', name, code);
 }
 
 function joinTeam(team) {
@@ -729,3 +777,126 @@ if (typeof window !== 'undefined') {
         offerTrade
     };
 }
+
+function showRiotAccountLinking(action, playerName, roomCode = null) {
+    const modal = document.createElement('div');
+    modal.className = 'riot-account-modal';
+    modal.innerHTML = `
+        <div class="riot-account-content">
+            <h3>Link Your Riot Account (Optional)</h3>
+            <p>Link your account to play with your real champion pool, or skip to use all champions!</p>
+            
+            <div class="riot-input-group">
+                <label>Riot ID:</label>
+                <input type="text" id="riotId" placeholder="TheSpattt#8839" class="input-field">
+                <small>Format: GameName#TAG (without spaces)</small>
+            </div>
+            
+            <div class="riot-input-group">
+                <label>Region:</label>
+                <select id="riotRegion" class="input-field">
+                    <option value="EUW">EUW - Europe West</option>
+                    <option value="NA">NA - North America</option>
+                    <option value="EUNE">EUNE - Europe Nordic East</option>
+                    <option value="KR">KR - Korea</option>
+                    <option value="BR">BR - Brazil</option>
+                    <option value="LAN">LAN - Latin America North</option>
+                    <option value="LAS">LAS - Latin America South</option>
+                    <option value="OCE">OCE - Oceania</option>
+                    <option value="TR">TR - Turkey</option>
+                    <option value="RU">RU - Russia</option>
+                    <option value="JP">JP - Japan</option>
+                </select>
+            </div>
+            
+            <div class="riot-buttons">
+                <button class="menu-button" onclick="linkAndProceed('${action}', '${playerName}', '${roomCode || ''}')">Link & ${action === 'create' ? 'Create Room' : 'Join Room'}</button>
+                <button class="menu-button decline-btn" onclick="skipAndProceed('${action}', '${playerName}', '${roomCode || ''}')">Skip (Use All Champions)</button>
+            </div>
+            
+            <div id="linkingStatus" class="linking-status"></div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+}
+
+function linkAndProceed(action, playerName, roomCode) {
+    const riotId = document.getElementById('riotId').value.trim();
+    const region = document.getElementById('riotRegion').value;
+    const statusDiv = document.getElementById('linkingStatus');
+    
+    if (!riotId || !riotId.includes('#')) {
+        statusDiv.innerHTML = '<span style="color: #d9534f;">Please enter a valid Riot ID (GameName#TAG)</span>';
+        return;
+    }
+    
+    statusDiv.innerHTML = '<span style="color: #c89b3c;">🔄 Linking account and proceeding...</span>';
+    
+    const [gameName] = riotId.split('#');
+    
+    gameState.pendingAction = { 
+        action, 
+        playerName: playerName, 
+        roomCode, 
+        useRiot: true,
+        fallbackName: gameName 
+    };
+    
+    socket.emit('linkRiotAccount', { riotId, region });
+}
+
+function skipAndProceed(action, playerName, roomCode) {
+    document.querySelector('.riot-account-modal').remove();
+    
+    // Proceed without Riot account - use all champions
+    if (action === 'create') {
+        socket.emit('createRoom', { 
+            playerName: playerName,
+            championPool: null // null means use all champions
+        });
+    } else {
+        socket.emit('joinRoom', { 
+            roomCode: roomCode,
+            playerName: playerName,
+            championPool: null // null means use all champions
+        });
+    }
+}
+
+// Updated Riot account response handler
+socket.on('riotAccountLinked', (data) => {
+    const statusDiv = document.getElementById('linkingStatus');
+    
+    if (data.success) {
+        statusDiv.innerHTML = `<span style="color: #5cb85c;">✅ ${data.message}</span>`;
+        
+        const pendingAction = gameState.pendingAction;
+        
+        setTimeout(() => {
+            document.querySelector('.riot-account-modal').remove();
+            
+            // Use Riot summoner name instead of entered name
+            const riotName = data.championPool.summonerName;
+            
+            if (pendingAction.action === 'create') {
+                socket.emit('createRoom', { 
+                    playerName: riotName,
+                    championPool: data.championPool.championIds
+                });
+            } else {
+                socket.emit('joinRoom', { 
+                    roomCode: pendingAction.roomCode,
+                    playerName: riotName,
+                    championPool: data.championPool.championIds
+                });
+            }
+            
+            // Clear pending action
+            gameState.pendingAction = null;
+        }, 1500);
+        
+    } else {
+        statusDiv.innerHTML = `<span style="color: #d9534f;">❌ ${data.error}</span>`;
+    }
+});

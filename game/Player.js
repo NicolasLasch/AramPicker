@@ -1,7 +1,12 @@
 class Player {
     constructor(socketId, name, socket = null) {
-        if (!socketId || !name) {
-            throw new Error('Socket ID and name are required');
+        if (!socketId) {
+            throw new Error('Socket ID is required for player creation');
+        }
+        
+        if (!name || typeof name !== 'string' || name.trim() === '') {
+            console.error('Invalid player name:', name, typeof name);
+            throw new Error(`Invalid player name: "${name}". Name must be a non-empty string.`);
         }
         
         this.socketId = socketId;
@@ -12,42 +17,26 @@ class Player {
         this.rerollTokens = 1;
         this.locked = false;
         this.ready = false;
+        this.championPool = null;
         this.joinedAt = Date.now();
         
-        console.log(`Player created: ${this.name} (${this.socketId})`);
+        console.log(`Player created successfully: "${this.name}" (${this.socketId})`);
     }
 
-    setTeam(team) {
-        if (team !== 'blue' && team !== 'red' && team !== null) {
-            throw new Error('Invalid team');
+    setChampionPool(championIds) {
+        this.championPool = championIds;
+        if (championIds && Array.isArray(championIds)) {
+            console.log(`Set champion pool for ${this.name}: ${championIds.length} champions`);
+        } else {
+            console.log(`${this.name} using all champions (no pool restriction)`);
         }
-        this.team = team;
     }
 
-    setChampion(champion) {
-        this.champion = champion;
-    }
-
-    useReroll() {
-        if (this.rerollTokens <= 0) {
-            throw new Error('No reroll tokens available');
+    hasChampion(championId) {
+        if (!this.championPool || !Array.isArray(this.championPool)) {
+            return true; // No restriction - has all champions
         }
-        this.rerollTokens--;
-    }
-
-    lock() {
-        if (!this.champion) {
-            throw new Error('Cannot lock without a champion');
-        }
-        this.locked = true;
-    }
-
-    unlock() {
-        this.locked = false;
-    }
-
-    canTrade() {
-        return this.champion && !this.locked && this.team;
+        return this.championPool.includes(championId);
     }
 
     toJSON() {
@@ -59,6 +48,7 @@ class Player {
             rerollTokens: this.rerollTokens,
             locked: this.locked,
             ready: this.ready,
+            championPoolSize: this.championPool ? this.championPool.length : 'all',
             joinedAt: this.joinedAt
         };
     }

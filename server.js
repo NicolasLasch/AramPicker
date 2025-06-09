@@ -1,3 +1,209 @@
+const RIOT_API_KEY = process.env.RIOT_API_KEY;
+
+const RIOT_REGIONS = {
+    'EUW': 'euw1',
+    'NA': 'na1', 
+    'EUNE': 'eun1',
+    'KR': 'kr',
+    'BR': 'br1',
+    'LAN': 'la1',
+    'LAS': 'la2',
+    'OCE': 'oc1',
+    'TR': 'tr1',
+    'RU': 'ru',
+    'JP': 'jp1'
+};
+
+const STARTER_CHAMPIONS = [
+    86, 22, 13, 1, 89, 54, 17, 18, 19, 45  // Common starter champions by ID
+];
+
+async function getRiotChampionPool(riotId, region) {
+    try {
+        console.log(`Fetching champion pool for ${riotId} in ${region}`);
+        
+        // Parse Riot ID (TheSpattt#8839)
+        const [gameName, tagLine] = riotId.split('#');
+        if (!gameName || !tagLine) {
+            throw new Error('Invalid Riot ID format. Use: GameName#TAG');
+        }
+        
+        const regionCode = RIOT_REGIONS[region.toUpperCase()];
+        if (!regionCode) {
+            throw new Error('Invalid region');
+        }
+
+        // Step 1: Get account by Riot ID
+        const accountResponse = await fetch(
+            `https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`,
+            {
+                headers: {
+                    'X-Riot-Token': RIOT_API_KEY
+                }
+            }
+        );
+
+        if (!accountResponse.ok) {
+            if (accountResponse.status === 404) {
+                throw new Error('Riot account not found. Check your Riot ID and try again.');
+            }
+            throw new Error(`Riot API error: ${accountResponse.status}`);
+        }
+
+        const accountData = await accountResponse.json();
+        const puuid = accountData.puuid;
+
+        // Step 2: Get summoner info by PUUID
+        const summonerResponse = await fetch(
+            `https://${regionCode}.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${puuid}`,
+            {
+                headers: {
+                    'X-Riot-Token': RIOT_API_KEY
+                }
+            }
+        );
+
+        if (!summonerResponse.ok) {
+            throw new Error('Summoner not found in this region');
+        }
+
+        const summonerData = await summonerResponse.json();
+        const summonerName = summonerData.name || gameName;
+        const summonerLevel = summonerData.summonerLevel || 30;
+        
+        console.log(`Found summoner: ${summonerName}, Level: ${summonerLevel}`);
+
+        // Step 3: Get champion mastery
+        const masteryResponse = await fetch(
+            `https://${regionCode}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-summoner/${summonerData.id}`,
+            {
+                headers: {
+                    'X-Riot-Token': RIOT_API_KEY
+                }
+            }
+        );
+
+        let masteryChampions = [];
+        if (masteryResponse.ok) {
+            const masteryData = await masteryResponse.json();
+            masteryChampions = masteryData.map(champ => champ.championId);
+        }
+
+        // Step 4: Get free rotation
+        const rotationResponse = await fetch(
+            `https://${regionCode}.api.riotgames.com/lol/platform/v3/champion-rotations`,
+            {
+                headers: {
+                    'X-Riot-Token': RIOT_API_KEY
+                }
+            }
+        );
+
+        let freeRotation = [];
+        if (rotationResponse.ok) {
+            const rotationData = await rotationResponse.json();
+            freeRotation = rotationData.freeChampionIds;
+        }
+
+        // Step 5: Estimate owned champions (IDs)
+        const ownedChampionIds = new Set([
+            ...STARTER_CHAMPIONS,
+            ...freeRotation,
+            ...masteryChampions
+        ]);
+
+        const additionalChampions = estimateAdditionalChampions(summonerLevel, masteryChampions.length);
+        additionalChampions.forEach(id => ownedChampionIds.add(id));
+
+        console.log(`Estimated ${ownedChampionIds.size} total owned champion IDs`);
+        
+        // Step 6: Convert IDs to champion names
+        const championNames = await convertChampionIdsToNames(Array.from(ownedChampionIds));
+        
+        console.log(`Converted to ${championNames.length} champion names`);
+        console.log(`Sample names: ${championNames.slice(0, 5)}`);
+        
+        return {
+            championIds: championNames,
+            summonerName: summonerName,
+            summonerLevel: summonerLevel,
+            masteryCount: masteryChampions.length
+        };
+
+    } catch (error) {
+        console.error('Error fetching Riot data:', error);
+        throw error;
+    }
+}
+
+function estimateAdditionalChampions(summonerLevel, masteryCount) {
+    // Rough estimation based on typical player progression
+    const popularChampionIds = [
+        1, 22, 51, 69, 31, 36, 81, 61, 74, 85, 121, 11, 21, 37, 16, 
+        99, 90, 20, 2, 14, 15, 72, 27, 86, 75, 103, 84, 120, 96
+    ];
+    
+    let estimatedOwned = Math.min(
+        Math.floor(summonerLevel / 3) + Math.floor(masteryCount * 1.5),
+        popularChampionIds.length
+    );
+    
+    return popularChampionIds.slice(0, estimatedOwned);
+}
+
+async function convertChampionIdsToNames(championIds) {
+    try {
+        // Get champion data from Riot API (same as your game uses)
+        const https = require('https');
+        
+        const championData = await new Promise((resolve, reject) => {
+            const req = https.get('https://ddragon.leagueoflegends.com/cdn/13.24.1/data/en_US/champion.json', (res) => {
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => {
+                    try {
+                        resolve(JSON.parse(data));
+                    } catch (e) {
+                        reject(e);
+                    }
+                });
+            });
+            req.on('error', reject);
+            req.setTimeout(5000, () => {
+                req.destroy();
+                reject(new Error('Request timeout'));
+            });
+        });
+
+        if (!championData.data) {
+            throw new Error('Failed to get champion data');
+        }
+
+        // Create mapping: championKey (number) -> championName (string)
+        const keyToNameMap = {};
+        Object.values(championData.data).forEach(champ => {
+            keyToNameMap[parseInt(champ.key)] = champ.name;
+        });
+
+        // Convert champion IDs to names
+        const championNames = championIds
+            .map(id => keyToNameMap[id])
+            .filter(name => name !== undefined); // Remove any that couldn't be converted
+
+        console.log(`ID to Name conversion examples:`);
+        championIds.slice(0, 3).forEach(id => {
+            console.log(`  ${id} -> ${keyToNameMap[id]}`);
+        });
+        
+        return championNames;
+        
+    } catch (error) {
+        console.error('Error converting champion IDs to names:', error);
+        // Return empty array to fallback to all champions
+        return [];
+    }
+}
+
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -128,18 +334,35 @@ function cleanupRoom(roomCode) {
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
-    socket.on('createRoom', (playerName) => {
+    socket.on('createRoom', (data) => {
         try {
-            console.log(`Attempting to create room for player: ${playerName}`);
+            let { playerName, championPool } = data;
+            
+            // Validate player name
+            if (!playerName || typeof playerName !== 'string' || playerName.trim() === '' || playerName === 'undefined') {
+                throw new Error('Invalid player name provided');
+            }
+            
+            playerName = playerName.trim();
+            
+            console.log(`Creating room for: "${playerName}"`);
+            console.log(`Champion pool:`, championPool ? `${championPool.length} champions` : 'all champions');
+            
             const room = createRoom(socket, playerName);
-            console.log(`Room created successfully: ${room.code}`);
+            
+            // Set champion pool for the player
+            if (room.players.has(socket.id)) {
+                const player = room.players.get(socket.id);
+                player.setChampionPool(championPool);
+            }
             
             socket.emit('roomCreated', {
                 roomCode: room.code,
                 isHost: true,
                 gameState: room.getGameStateForPlayer(socket.id)
             });
-            console.log(`Room ${room.code} created by ${playerName}`);
+            
+            console.log(`Room ${room.code} created by "${playerName}"`);
         } catch (error) {
             console.error('Error creating room:', error);
             socket.emit('error', `Failed to create room: ${error.message}`);
@@ -147,8 +370,19 @@ io.on('connection', (socket) => {
     });
 
     socket.on('joinRoom', (data) => {
-        const { roomCode, playerName } = data;
+        let { roomCode, playerName, championPool } = data;
+        
+        // Validate player name
+        if (!playerName || typeof playerName !== 'string' || playerName.trim() === '' || playerName === 'undefined') {
+            socket.emit('error', 'Invalid player name provided');
+            return;
+        }
+        
+        playerName = playerName.trim();
         const room = gameRooms.get(roomCode);
+        
+        console.log(`"${playerName}" joining room ${roomCode}`);
+        console.log(`Champion pool:`, championPool ? `${championPool.length} champions` : 'all champions');
         
         if (!room) {
             socket.emit('error', 'Room not found');
@@ -174,22 +408,44 @@ io.on('connection', (socket) => {
             socket.join(roomCode);
             room.addPlayer(socket.id, playerName, socket);
             
+            // Set champion pool for the player
+            if (room.players.has(socket.id)) {
+                const player = room.players.get(socket.id);
+                player.setChampionPool(championPool);
+            }
+            
             socket.emit('roomJoined', {
                 roomCode: room.code,
                 isHost: false,
                 gameState: room.getGameStateForPlayer(socket.id)
             });
 
-            room.players.forEach((player, playerId) => {
-                const playerSocket = player.socket;
-                if (playerSocket) {
-                    playerSocket.emit('gameStateUpdate', room.getGameStateForPlayer(playerId));
-                }
+            sendPersonalizedUpdates(room);
+            
+            console.log(`"${playerName}" joined room ${roomCode}`);
+        } catch (error) {
+            console.error('Error joining room:', error);
+            socket.emit('error', 'Failed to join room');
+        }
+    });
+
+    socket.on('linkRiotAccount', async (data) => {
+        const { riotId, region } = data;
+        
+        try {
+            const championPool = await getRiotChampionPool(riotId, region);
+            
+            socket.emit('riotAccountLinked', {
+                success: true,
+                championPool: championPool,
+                message: `Successfully linked ${championPool.summonerName} (Level ${championPool.summonerLevel})`
             });
             
-            console.log(`${playerName} joined room ${roomCode}`);
         } catch (error) {
-            socket.emit('error', 'Failed to join room');
+            socket.emit('riotAccountLinked', {
+                success: false,
+                error: error.message
+            });
         }
     });
 
