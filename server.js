@@ -34,7 +34,6 @@ async function getRiotChampionPool(riotId, region) {
             throw new Error('Invalid region');
         }
 
-        // Get account data first
         const accountResponse = await fetch(
             `https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`,
             {

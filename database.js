@@ -5,8 +5,84 @@ async function getAllChampionsFromRiot() {
     try {
         const https = require('https');
         
+        // First, get the latest version
+        console.log('🔍 Fetching latest Data Dragon version...');
+        const latestVersion = await new Promise((resolve, reject) => {
+            const req = https.get('https://ddragon.leagueoflegends.com/api/versions.json', (res) => {
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => {
+                    try {
+                        const versions = JSON.parse(data);
+                        resolve(versions[0]); // Latest version is first
+                    } catch (e) {
+                        reject(e);
+                    }
+                });
+            });
+            req.on('error', reject);
+            req.setTimeout(5000, () => {
+                req.destroy();
+                reject(new Error('Request timeout'));
+            });
+        });
+
+        console.log(`✅ Latest Data Dragon version: ${latestVersion}`);
+        
+        // Get champion data using latest version
         const championData = await new Promise((resolve, reject) => {
-            const req = https.get('https://ddragon.leagueoflegends.com/cdn/13.24.1/data/en_US/champion.json', (res) => {
+            const url = `https://ddragon.leagueoflegends.com/cdn/${latestVersion}/data/en_US/champion.json`;
+            console.log(`🔍 Fetching champions from: ${url}`);
+            
+            const req = https.get(url, (res) => {
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => {
+                    try {
+                        resolve(JSON.parse(data));
+                    } catch (e) {
+                        reject(e);
+                    }
+                });
+            });
+            req.on('error', reject);
+            req.setTimeout(10000, () => {
+                req.destroy();
+                reject(new Error('Request timeout'));
+            });
+        });
+
+        if (championData.data) {
+            const champions = Object.values(championData.data).map(champ => ({
+                id: champ.id,
+                name: champ.name,
+                title: champ.title,
+                key: champ.key
+            }));
+            
+            console.log(`✅ Loaded ${champions.length} champions from Data Dragon ${latestVersion}`);
+            console.log(`📋 Latest 5 champions: ${champions.slice(-5).map(c => c.name)}`);
+            console.log(`📋 First 5 champions: ${champions.slice(0, 5).map(c => c.name)}`);
+            
+            return champions;
+        }
+        
+        return [];
+    } catch (error) {
+        console.error('❌ Error fetching champions from Riot API:', error);
+        
+        // Fallback to hardcoded version if API fails
+        console.log('⚠️  Falling back to version 14.1.1...');
+        return await getFallbackChampions();
+    }
+}
+
+async function getFallbackChampions() {
+    try {
+        const https = require('https');
+        
+        const championData = await new Promise((resolve, reject) => {
+            const req = https.get('https://ddragon.leagueoflegends.com/cdn/14.1.1/data/en_US/champion.json', (res) => {
                 let data = '';
                 res.on('data', chunk => data += chunk);
                 res.on('end', () => {
@@ -25,16 +101,20 @@ async function getAllChampionsFromRiot() {
         });
 
         if (championData.data) {
-            return Object.values(championData.data).map(champ => ({
+            const champions = Object.values(championData.data).map(champ => ({
                 id: champ.id,
                 name: champ.name,
-                title: champ.title
+                title: champ.title,
+                key: champ.key
             }));
+            
+            console.log(`⚠️  Fallback: Loaded ${champions.length} champions from 14.1.1`);
+            return champions;
         }
         
         return [];
     } catch (error) {
-        console.error('Error fetching champions from Riot API:', error);
+        console.error('❌ Fallback also failed:', error);
         return [];
     }
 }
