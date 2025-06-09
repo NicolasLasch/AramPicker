@@ -186,42 +186,75 @@ class GameRoom {
     assignRandomChampions() {
         const playersWithTeams = Array.from(this.players.values()).filter(p => p.team);
         
+        // Track assigned champions by team to prevent duplicates
+        const teamAssignments = {
+            blue: new Set(),
+            red: new Set()
+        };
+        
         playersWithTeams.forEach(player => {
-            console.log(`\n=== Assigning champion for ${player.name} ===`);
+            console.log(`\n=== Assigning champion for ${player.name} (${player.team} team) ===`);
             console.log(`Player champion pool:`, player.championPool ? player.championPool.length : 'none');
             
             let availableChampions;
             
             if (player.championPool && player.championPool.length > 0) {
-                // Player has Riot account linked - filter by champion name
-                console.log(`Sample owned champions: ${player.championPool.slice(0, 5)}`);
-                console.log(`Sample game champions: ${this.champions.slice(0, 5).map(c => c.name)}`);
-                
+                console.log(`🎯 Using custom pool: ${player.championPool.length} champions`);
                 availableChampions = this.champions.filter(c => 
                     player.championPool.includes(c.name)
                 );
                 
-                console.log(`${player.name} has ${availableChampions.length} owned champions after filtering`);
-                
                 if (availableChampions.length === 0) {
-                    console.log(`WARNING: No champion name matches found! Using all champions as fallback.`);
+                    console.log(`⚠️  No matching champions in pool, using all champions`);
                     availableChampions = this.champions;
                 }
             } else {
-                // Player skipped Riot linking - use all champions
+                console.log(`🎯 Using all champions: ${this.champions.length} champions`);
                 availableChampions = this.champions;
-                console.log(`${player.name} using all ${availableChampions.length} champions`);
             }
             
-            if (availableChampions.length > 0) {
-                const randomChampion = availableChampions[Math.floor(Math.random() * availableChampions.length)];
-                player.champion = randomChampion;
-                console.log(`✅ Assigned ${randomChampion.name} to ${player.name}`);
+            // Get champions already taken by this team
+            const teamTaken = teamAssignments[player.team];
+            console.log(`🚫 Team ${player.team} already has: ${Array.from(teamTaken)}`);
+            
+            // Filter out champions already taken by team
+            const validChampions = availableChampions.filter(c => 
+                !teamTaken.has(c.name)
+            );
+            
+            console.log(`✅ Valid options: ${validChampions.length} champions`);
+            
+            if (validChampions.length === 0) {
+                console.log(`⚠️  No valid champions left, using any available champion`);
+                // Fallback: any champion not taken by team
+                const fallbackChampions = this.champions.filter(c => 
+                    !teamTaken.has(c.name)
+                );
+                
+                if (fallbackChampions.length > 0) {
+                    const randomChampion = fallbackChampions[Math.floor(Math.random() * fallbackChampions.length)];
+                    player.champion = randomChampion;
+                    teamTaken.add(randomChampion.name);
+                    console.log(`🔧 Fallback assigned: ${randomChampion.name}`);
+                } else {
+                    // Ultimate fallback: just assign any champion (shouldn't happen)
+                    const randomChampion = this.champions[Math.floor(Math.random() * this.champions.length)];
+                    player.champion = randomChampion;
+                    console.log(`🆘 Emergency assigned: ${randomChampion.name}`);
+                }
             } else {
-                console.error(`❌ No available champions for ${player.name}!`);
+                const randomChampion = validChampions[Math.floor(Math.random() * validChampions.length)];
+                player.champion = randomChampion;
+                teamTaken.add(randomChampion.name);
+                console.log(`✅ Assigned: ${randomChampion.name}`);
             }
-            console.log(`=== End ${player.name} ===\n`);
+            
+            console.log(`=== End ${player.name} ===`);
         });
+        
+        console.log(`\n📋 Final assignments:`);
+        console.log(`Blue team: ${Array.from(teamAssignments.blue)}`);
+        console.log(`Red team: ${Array.from(teamAssignments.red)}\n`);
     }
 
     rerollChampion(socketId) {
@@ -231,52 +264,114 @@ class GameRoom {
         }
 
         const oldChampion = player.champion;
-        console.log(`${player.name} is rerolling ${oldChampion.name}`);
+        console.log(`\n🎲 ${player.name} rerolling ${oldChampion.name}`);
 
-        // Get available champions based on player's champion pool
+        // Get player's available champions
         let availableChampions;
         if (player.championPool && player.championPool.length > 0) {
-            // Player has Riot account - filter by champion name
             availableChampions = this.champions.filter(c => 
                 player.championPool.includes(c.name)
             );
             
-            console.log(`${player.name} can reroll from ${availableChampions.length} owned champions`);
-            
             if (availableChampions.length === 0) {
-                console.log(`WARNING: No owned champions found for reroll! Using all champions.`);
                 availableChampions = this.champions;
             }
+            console.log(`🎯 Using player pool: ${availableChampions.length} champions`);
         } else {
-            // Player skipped Riot linking - can use all champions
             availableChampions = this.champions;
-            console.log(`${player.name} can reroll from all ${availableChampions.length} champions`);
+            console.log(`🎯 Using all champions: ${availableChampions.length} champions`);
         }
 
-        // Exclude current champion and team bench from available pool
+        // DEBUG: Log all players and their champions
+        console.log(`🔍 All players in room:`);
+        for (const [playerId, p] of this.players) {
+            console.log(`   - ${p.name} (${p.team}): ${p.champion ? p.champion.name : 'no champion'} [ID: ${playerId}]`);
+        }
+
+        // Get ALL champions currently held by teammates on same team
+        const teammates = Array.from(this.players.values()).filter(p => 
+            p.team === player.team && 
+            p.id !== player.id && 
+            p.champion
+        );
+        
+        console.log(`🤝 Teammates on ${player.team} team:`);
+        teammates.forEach(teammate => {
+            console.log(`   - ${teammate.name}: ${teammate.champion.name}`);
+        });
+
+        const teammateCurrentChampions = teammates.map(p => p.champion.name);
+
+        // Get team bench champions
         const teamBench = player.team === 'blue' ? this.blueBench : this.redBench;
-        const excludeNames = [oldChampion.name, ...teamBench.map(c => c.name)];
-        const validChampions = availableChampions.filter(c => !excludeNames.includes(c.name));
+        const benchChampions = teamBench ? teamBench.map(c => c.name) : [];
+        
+        // Exclude: current champion + ALL teammate current champions + ALL bench champions
+        const excludeNames = [
+            oldChampion.name, 
+            ...teammateCurrentChampions, 
+            ...benchChampions
+        ];
+        
+        // Remove duplicates
+        const uniqueExcluded = [...new Set(excludeNames)];
+        
+        const validChampions = availableChampions.filter(c => !uniqueExcluded.includes(c.name));
+
+        console.log(`🚫 Excluding:`);
+        console.log(`   - Current: ${oldChampion.name}`);
+        console.log(`   - Teammates have: ${teammateCurrentChampions}`);
+        console.log(`   - In bench: ${benchChampions}`);
+        console.log(`   - Total excluded: ${uniqueExcluded}`);
+        console.log(`✅ Valid options: ${validChampions.length}`);
+        
+        if (validChampions.length > 0) {
+            console.log(`✅ Valid champions: ${validChampions.slice(0, 5).map(c => c.name)}...`);
+        }
 
         if (validChampions.length === 0) {
-            throw new Error('No available champions to reroll to in your champion pool');
+            throw new Error('No available champions to reroll to - all champions from your pool are taken by teammates or in bench');
         }
 
-        // Add old champion to team bench
+        // Add old champion to bench
         if (player.team === 'blue') {
             if (!this.blueBench) this.blueBench = [];
             this.blueBench.push(oldChampion);
-        } else if (player.team === 'red') {
+        } else {
             if (!this.redBench) this.redBench = [];
             this.redBench.push(oldChampion);
         }
 
-        // Get new random champion from valid pool
+        // Assign new champion
         const randomChampion = validChampions[Math.floor(Math.random() * validChampions.length)];
         player.champion = randomChampion;
         player.rerollTokens--;
         
-        console.log(`${player.name} rerolled to ${randomChampion.name}, ${player.rerollTokens} tokens left`);
+        console.log(`✅ Rerolled to: ${randomChampion.name} (${player.rerollTokens} tokens left)`);
+        
+        // Final verification
+        const finalTeammates = Array.from(this.players.values()).filter(p => 
+            p.team === player.team && p.champion
+        );
+        
+        console.log(`🔍 Final team state:`);
+        finalTeammates.forEach(p => {
+            console.log(`   - ${p.name}: ${p.champion.name}`);
+        });
+        
+        const currentTeamChampions = finalTeammates.map(p => p.champion.name);
+        const duplicates = currentTeamChampions.filter((name, index) => 
+            currentTeamChampions.indexOf(name) !== index
+        );
+        
+        if (duplicates.length > 0) {
+            console.error(`🚨 ERROR: Duplicate found after reroll: ${duplicates}`);
+            console.error(`🚨 Team champions: ${currentTeamChampions}`);
+        } else {
+            console.log(`✅ Team verification passed: ${currentTeamChampions}`);
+        }
+        
+        console.log(`🎲 Reroll complete\n`);
     }
 
     swapWithBench(socketId, championId) {
@@ -285,7 +380,6 @@ class GameRoom {
             throw new Error('Cannot swap');
         }
 
-        // Find the champion in team bench by ID
         const teamBench = player.team === 'blue' ? this.blueBench : this.redBench;
         if (!teamBench) {
             throw new Error('Team bench not initialized');
@@ -298,24 +392,32 @@ class GameRoom {
 
         const benchChampion = teamBench[benchIndex];
 
-        // Check if player owns the champion they want to swap to (by name)
+        // Check ownership
         if (player.championPool && player.championPool.length > 0) {
             if (!player.championPool.includes(benchChampion.name)) {
                 throw new Error(`You do not own ${benchChampion.name}`);
             }
         }
 
+        // Check team duplicates
+        const teammateHasChampion = Array.from(this.players.values()).some(p => 
+            p.team === player.team && 
+            p.id !== player.id && 
+            p.champion && 
+            p.champion.name === benchChampion.name
+        );
+
+        if (teammateHasChampion) {
+            throw new Error(`A teammate already has ${benchChampion.name}`);
+        }
+
+        // Perform swap
         const oldChampion = player.champion;
-        
-        console.log(`${player.name} swapping ${oldChampion.name} for ${benchChampion.name}`);
-        
-        // Perform the swap
         teamBench[benchIndex] = oldChampion;
         player.champion = benchChampion;
         
-        console.log(`Swap complete for ${player.name}`);
+        console.log(`${player.name} swapped ${oldChampion.name} ↔ ${benchChampion.name}`);
     }
-
     getAvailableChampions() {
         const usedChampions = Array.from(this.players.values())
             .filter(p => p.champion)
@@ -347,19 +449,37 @@ class GameRoom {
         const fromPlayer = this.players.get(fromSocketId);
         const toPlayer = this.players.get(toSocketId);
         
-        if (!fromPlayer || !toPlayer || !fromPlayer.champion || !toPlayer.champion) {
-            throw new Error('Invalid trade offer');
+        if (!fromPlayer || !toPlayer) {
+            throw new Error('Invalid trade players');
         }
 
-        if (fromPlayer.team !== toPlayer.team || fromPlayer.locked || toPlayer.locked) {
-            throw new Error('Cannot trade');
+        if (!fromPlayer.champion || !toPlayer.champion) {
+            throw new Error('Both players must have champions to trade');
         }
+
+        if (fromPlayer.team !== toPlayer.team) {
+            throw new Error('Can only trade with teammates');
+        }
+
+        if (fromPlayer.locked || toPlayer.locked) {
+            throw new Error('Cannot trade with locked players');
+        }
+
+        console.log(`Trade offer: ${fromPlayer.name} (${fromPlayer.champion.name}) wants to trade with ${toPlayer.name} (${toPlayer.champion.name})`);
 
         this.pendingTrades.set(toSocketId, {
             from: fromSocketId,
             to: toSocketId,
             timestamp: Date.now()
         });
+
+        return {
+            success: true,
+            fromPlayerName: fromPlayer.name,
+            toPlayerName: toPlayer.name,
+            fromChampion: fromPlayer.champion,
+            toChampion: toPlayer.champion
+        };
     }
 
     acceptTrade(socketId) {

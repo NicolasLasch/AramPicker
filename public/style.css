@@ -726,3 +726,300 @@ body {
     margin-top: 5px;
     font-style: italic;
 }
+
+.champion-pool-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.champion-pool-content {
+    background: linear-gradient(135deg, #1e2328 0%, #3c3c41 100%);
+    border: 2px solid #c89b3c;
+    border-radius: 12px;
+    padding: 20px;
+    max-width: 800px;
+    max-height: 80vh;
+    width: 90%;
+    overflow-y: auto;
+    color: #cdbe91;
+}
+
+.champion-pool-header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.champion-pool-header h3 {
+    color: #f0e6d2;
+    margin: 0 0 10px 0;
+}
+
+.pool-stats {
+    display: flex;
+    justify-content: space-between;
+    margin: 15px 0;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 6px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.search-section {
+    margin: 15px 0;
+}
+
+.search-input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #463714;
+    border-radius: 6px;
+    background: #1e2328;
+    color: #cdbe91;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.champion-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+}
+
+.champion-card {
+    background: #1e2328;
+    border: 2px solid #463714;
+    border-radius: 8px;
+    padding: 6px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.champion-card:hover {
+    border-color: #c89b3c;
+    transform: translateY(-2px);
+}
+
+.champion-card.selected {
+    border-color: #5cb85c;
+    background: rgba(92, 184, 92, 0.1);
+}
+
+.champion-card img {
+    width: 50px;
+    height: 50px;
+    border-radius: 4px;
+    object-fit: cover;
+}
+
+.champion-name {
+    font-size: 10px;
+    margin-top: 4px;
+    color: #cdbe91;
+    word-wrap: break-word;
+}
+
+.selected-indicator {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: #5cb85c;
+    color: white;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+.pool-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.pool-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 120px;
+}
+
+.pool-btn.save {
+    background: #5cb85c;
+    color: white;
+}
+
+.pool-btn.save:hover {
+    background: #449d44;
+}
+
+.pool-btn.cancel {
+    background: #d9534f;
+    color: white;
+}
+
+.pool-btn.cancel:hover {
+    background: #c9302c;
+}
+
+.pool-btn.select-all {
+    background: #c89b3c;
+    color: #1e2328;
+}
+
+.pool-btn.select-all:hover {
+    background: #b8891e;
+}
+
+.loading-indicator {
+    text-align: center;
+    padding: 20px;
+    color: #c89b3c;
+}
+
+.error-message {
+    background: rgba(217, 83, 79, 0.1);
+    border: 1px solid #d9534f;
+    color: #d9534f;
+    padding: 10px;
+    border-radius: 6px;
+    margin: 10px 0;
+    text-align: center;
+}
+
+.success-message {
+    background: rgba(92, 184, 92, 0.1);
+    border: 1px solid #5cb85c;
+    color: #5cb85c;
+    padding: 10px;
+    border-radius: 6px;
+    margin: 10px 0;
+    text-align: center;
+}
+
+/* Responsive improvements */
+.riot-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 20px 0;
+}
+
+.menu-button.primary {
+    background: #5cb85c;
+    order: 1;
+}
+
+.menu-button.secondary {
+    background: #c89b3c;
+    color: #1e2328;
+    order: 2;
+}
+
+.menu-button.decline-btn {
+    order: 3;
+}
+
+@media (min-width: 600px) {
+    .riot-buttons {
+        flex-direction: row;
+        justify-content: center;
+    }
+    
+    .pool-actions {
+        flex-wrap: nowrap;
+    }
+    
+    .champion-grid {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    }
+    
+    .champion-card img {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .champion-name {
+        font-size: 11px;
+    }
+}
+
+.champion-card.selected {
+    border-color: #5cb85c;
+    background: rgba(92, 184, 92, 0.2);
+    box-shadow: 0 0 10px rgba(92, 184, 92, 0.3);
+}
+
+.selected-indicator {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: #5cb85c;
+    color: white;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.trade-confirmation {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1500;
+}
+
+.trade-confirmation-content {
+    background: linear-gradient(135deg, #1e2328 0%, #3c3c41 100%);
+    border: 2px solid #c89b3c;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    color: #cdbe91;
+    min-width: 300px;
+}
+
+.trade-confirmation-content h4 {
+    color: #f0e6d2;
+    margin: 0 0 15px 0;
+}
+
+.trade-confirmation-content p {
+    margin: 10px 0;
+}

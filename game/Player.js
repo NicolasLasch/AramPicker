@@ -10,6 +10,7 @@ class Player {
         }
         
         this.socketId = socketId;
+        this.id = socketId;
         this.name = name.trim();
         this.socket = socket;
         this.team = null;
@@ -18,6 +19,7 @@ class Player {
         this.locked = false;
         this.ready = false;
         this.championPool = null;
+        this.riotData = null;
         this.joinedAt = Date.now();
         
         console.log(`Player created successfully: "${this.name}" (${this.socketId})`);
@@ -32,11 +34,20 @@ class Player {
         }
     }
 
+    setRiotData(puuid, region) {
+        this.riotData = { puuid, region };
+        console.log(`Set Riot data for ${this.name}: ${puuid} in ${region}`);
+    }
+
     hasChampion(championId) {
         if (!this.championPool || !Array.isArray(this.championPool)) {
-            return true; // No restriction - has all champions
+            return true;
         }
         return this.championPool.includes(championId);
+    }
+
+    hasRiotAccount() {
+        return this.riotData && this.riotData.puuid;
     }
 
     toJSON() {
@@ -49,6 +60,7 @@ class Player {
             locked: this.locked,
             ready: this.ready,
             championPoolSize: this.championPool ? this.championPool.length : 'all',
+            hasRiotAccount: this.hasRiotAccount(),
             joinedAt: this.joinedAt
         };
     }

@@ -213,6 +213,11 @@ function setupSocketListeners() {
         showTradeRequest(tradeData);
     });
 
+    socket.on('tradeOfferSent', (data) => {
+        console.log('Trade offer sent successfully:', data);
+        showTradeConfirmation(data.targetPlayerName);
+    });
+
     socket.on('error', (message) => {
         showError(message);
     });
@@ -223,42 +228,63 @@ function setupSocketListeners() {
         if (data.success) {
             console.log('Riot account linked successfully:', data.championPool);
             
-            statusDiv.innerHTML = `<span style="color: #5cb85c;">✅ ${data.message}</span>`;
-            
             const pendingAction = gameState.pendingAction;
             
-            setTimeout(() => {
-                document.querySelector('.riot-account-modal').remove();
+            if (pendingAction && pendingAction.action === 'championPool') {
+                // Open champion pool manager with real account data
+                statusDiv.innerHTML = `<span style="color: #5cb85c;">✅ Account linked! Opening champion pool manager...</span>`;
                 
-                // Use Riot summoner name, with fallbacks
-                let playerName = data.championPool?.summonerName;
-                
-                // Fallback chain if summonerName is undefined
-                if (!playerName || playerName === 'undefined') {
-                    const riotId = document.getElementById('riotId').value.trim();
-                    const [gameName] = riotId.split('#');
-                    playerName = gameName || pendingAction.playerName;
-                }
-                
-                console.log(`Using player name: ${playerName}`);
-                console.log(`Champion pool size: ${data.championPool?.championIds?.length || 0}`);
-                
-                if (pendingAction.action === 'create') {
-                    socket.emit('createRoom', { 
-                        playerName: playerName,
-                        championPool: data.championPool?.championIds || []
+                setTimeout(() => {
+                    document.querySelector('.riot-account-modal').remove();
+                    
+                    showChampionPoolManager({
+                        puuid: data.championPool.puuid,
+                        summonerName: data.championPool.summonerName,
+                        region: data.championPool.region,
+                        action: pendingAction.originalAction,
+                        playerName: pendingAction.playerName,
+                        roomCode: pendingAction.roomCode
                     });
-                } else {
-                    socket.emit('joinRoom', { 
-                        roomCode: pendingAction.roomCode,
-                        playerName: playerName,
-                        championPool: data.championPool?.championIds || []
-                    });
-                }
+                    
+                    gameState.pendingAction = null;
+                }, 1000);
                 
-                // Clear pending action
-                gameState.pendingAction = null;
-            }, 1500);
+            } else {
+                // Normal game creation/joining flow
+                statusDiv.innerHTML = `<span style="color: #5cb85c;">✅ ${data.message}</span>`;
+                
+                setTimeout(() => {
+                    document.querySelector('.riot-account-modal').remove();
+                    
+                    let playerName = data.championPool?.summonerName;
+                    
+                    if (!playerName || playerName === 'undefined') {
+                        const riotId = document.getElementById('riotId').value.trim();
+                        const [gameName] = riotId.split('#');
+                        playerName = gameName || pendingAction.playerName;
+                    }
+                    
+                    console.log(`Using player name: ${playerName}`);
+                    console.log(`Champion pool size: ${data.championPool?.championIds?.length || 0}`);
+                    
+                    if (pendingAction.action === 'create') {
+                        socket.emit('createRoom', { 
+                            playerName: playerName,
+                            championPool: data.championPool?.championIds || [],
+                            riotData: data.riotData
+                        });
+                    } else {
+                        socket.emit('joinRoom', { 
+                            roomCode: pendingAction.roomCode,
+                            playerName: playerName,
+                            championPool: data.championPool?.championIds || [],
+                            riotData: data.riotData
+                        });
+                    }
+                    
+                    gameState.pendingAction = null;
+                }, 1500);
+            }
             
         } else {
             statusDiv.innerHTML = `<span style="color: #d9534f;">❌ ${data.error}</span>`;
@@ -484,7 +510,7 @@ function createPlayerSlot(player) {
 
     const portrait = createChampionPortrait(player.champion, () => {
         if (player.id === gameState.currentPlayerId && !player.locked && player.champion) {
-            // Could implement unselect functionality here
+            
         }
     });
 
@@ -498,6 +524,14 @@ function createPlayerSlot(player) {
     const champion = document.createElement('div');
     champion.className = 'champion-name';
     champion.textContent = player.champion ? player.champion.name : 'No Champion';
+
+    const winrateDiv = document.createElement('div');
+    winrateDiv.className = 'champion-winrate';
+    winrateDiv.id = `winrate-${player.id}`;
+    
+    if (player.champion && player.id === gameState.currentPlayerId) {
+        loadChampionWinrate(player.champion.name, player.id);
+    }
 
     if (player.id === gameState.currentPlayerId && !player.locked) {
         const controls = createPlayerControls(player);
@@ -513,6 +547,7 @@ function createPlayerSlot(player) {
 
     info.appendChild(name);
     info.appendChild(champion);
+    info.appendChild(winrateDiv);
     slot.appendChild(portrait);
     slot.appendChild(info);
 
@@ -527,7 +562,14 @@ function createPlayerControls(player) {
     rerollBtn.className = 'control-btn';
     rerollBtn.textContent = `Reroll (${player.rerollTokens})`;
     rerollBtn.disabled = player.rerollTokens <= 0 || !player.champion;
-    rerollBtn.onclick = () => rerollChampion();
+    rerollBtn.onclick = () => {
+        rerollChampion();
+        setTimeout(() => {
+            if (player.champion) {
+                loadChampionWinrate(player.champion.name, player.id);
+            }
+        }, 500);
+    };
 
     const lockBtn = document.createElement('button');
     lockBtn.className = 'control-btn';
@@ -550,6 +592,7 @@ function createPlayerControls(player) {
         controls.appendChild(buildBtn);
     }
 
+    // Updated trade button logic with validation
     const teammates = Object.values(gameState.players).filter(p => 
         p.team === player.team && 
         p.id !== player.id && 
@@ -563,11 +606,59 @@ function createPlayerControls(player) {
         const tradeBtn = document.createElement('button');
         tradeBtn.className = 'control-btn';
         tradeBtn.textContent = `Trade ${teammate.name}`;
-        tradeBtn.onclick = () => offerTrade(teammate.id);
+        
+        // Check if both players have champions
+        if (!player.champion || !teammate.champion) {
+            tradeBtn.disabled = true;
+            tradeBtn.title = 'Both players need champions to trade';
+        } else if (player.locked || teammate.locked) {
+            tradeBtn.disabled = true;
+            tradeBtn.title = 'Cannot trade with locked players';
+        } else {
+            tradeBtn.onclick = () => {
+                console.log(`Offering trade: ${player.champion.name} for ${teammate.champion.name}`);
+                offerTrade(teammate.id);
+            };
+            tradeBtn.title = `Trade your ${player.champion.name} for their ${teammate.champion.name}`;
+        }
+        
         controls.appendChild(tradeBtn);
     });
 
     return controls;
+}
+
+function loadChampionWinrate(championName, playerId) {
+    const winrateElement = document.getElementById(`winrate-${playerId}`);
+    if (!winrateElement) return;
+    
+    winrateElement.innerHTML = '<span style="color: #c89b3c; font-size: 11px;">Loading winrate...</span>';
+    
+    socket.emit('getChampionWinrate', { 
+        championName: championName,
+        playerSocketId: playerId
+    });
+}
+
+function displayChampionWinrate(championName, winrateData, playerId) {
+    const winrateElement = document.getElementById(`winrate-${playerId}`);
+    if (!winrateElement) return;
+    
+    if (!winrateData) {
+        winrateElement.innerHTML = '<span style="color: #cdbe91; font-size: 11px;">No recent ARAM data</span>';
+        return;
+    }
+    
+    const winrateColor = winrateData.winrate >= 60 ? '#5cb85c' : 
+                       winrateData.winrate >= 50 ? '#f0ad4e' : '#d9534f';
+    
+    winrateElement.innerHTML = `
+        <span style="color: ${winrateColor}; font-size: 12px; font-weight: bold;">
+            ${winrateData.winrate}% WR (${winrateData.wins}W/${winrateData.games}G)
+        </span>
+    `;
+    
+    winrateElement.title = `ARAM Winrate with ${championName}: ${winrateData.wins} wins out of ${winrateData.games} games (${winrateData.winrate}%)`;
 }
 
 function createChampionPortrait(champion, onClick) {
@@ -671,7 +762,12 @@ function createBenchChampionCard(champion) {
     
     const currentPlayer = gameState.players[gameState.currentPlayerId];
     if (currentPlayer && !currentPlayer.locked) {
-        card.addEventListener('click', () => swapWithBench(champion.id));
+        card.addEventListener('click', () => {
+            swapWithBench(champion.id);
+            setTimeout(() => {
+                loadChampionWinrate(champion.name, gameState.currentPlayerId);
+            }, 500);
+        });
         card.style.cursor = 'pointer';
     } else {
         card.style.cursor = 'not-allowed';
@@ -685,6 +781,39 @@ function showTradeRequest(tradeData) {
     elements.tradeMessage.textContent = 
         `${tradeData.fromPlayer} wants to trade ${tradeData.fromChampion.name} for your ${tradeData.toChampion.name}`;
     elements.tradeRequest.classList.remove('hidden');
+}
+
+function showTradeConfirmation(targetPlayerName) {
+    // Remove any existing trade confirmation
+    const existingConfirmation = document.querySelector('.trade-confirmation');
+    if (existingConfirmation) {
+        existingConfirmation.remove();
+    }
+
+    const confirmation = document.createElement('div');
+    confirmation.className = 'trade-confirmation';
+    confirmation.innerHTML = `
+        <div class="trade-confirmation-content">
+            <h4>Trade Offer Sent!</h4>
+            <p>You sent a trade request to <strong>${targetPlayerName}</strong></p>
+            <p>Waiting for their response...</p>
+            <button class="menu-button" onclick="hideTradeConfirmation()">OK</button>
+        </div>
+    `;
+    
+    document.body.appendChild(confirmation);
+    
+    // Auto-hide after 3 seconds
+    setTimeout(() => {
+        hideTradeConfirmation();
+    }, 3000);
+}
+
+function hideTradeConfirmation() {
+    const confirmation = document.querySelector('.trade-confirmation');
+    if (confirmation) {
+        confirmation.remove();
+    }
 }
 
 function showGameComplete() {
@@ -836,8 +965,15 @@ function showRiotAccountLinking(action, playerName, roomCode = null) {
             </div>
             
             <div class="riot-buttons">
-                <button class="menu-button" onclick="linkAndProceed('${action}', '${playerName}', '${roomCode || ''}')">Link & ${action === 'create' ? 'Create Room' : 'Join Room'}</button>
-                <button class="menu-button decline-btn" onclick="skipAndProceed('${action}', '${playerName}', '${roomCode || ''}')">Skip (Use All Champions)</button>
+                <button class="menu-button primary" onclick="linkAndProceed('${action}', '${playerName}', '${roomCode || ''}')">
+                    Link & ${action === 'create' ? 'Create Room' : 'Join Room'}
+                </button>
+                <button class="menu-button secondary" onclick="manageChampionPool('${action}', '${playerName}', '${roomCode || ''}')">
+                    Manage Champion Pool
+                </button>
+                <button class="menu-button decline-btn" onclick="skipAndProceed('${action}', '${playerName}', '${roomCode || ''}')">
+                    Skip (Use All Champions)
+                </button>
             </div>
             
             <div id="linkingStatus" class="linking-status"></div>
@@ -890,11 +1026,25 @@ function skipAndProceed(action, playerName, roomCode) {
     }
 }
 
-// Updated Riot account response handler
+socket.on('championWinrateResult', (data) => {
+    if (data.error) {
+        console.log('Winrate error:', data.error);
+        const winrateElement = document.getElementById(`winrate-${gameState.currentPlayerId}`);
+        if (winrateElement) {
+            winrateElement.innerHTML = '<span style="color: #cdbe91; font-size: 11px;">Account not linked</span>';
+        }
+        return;
+    }
+    
+    displayChampionWinrate(data.championName, data.winrate, gameState.currentPlayerId);
+});
+
 socket.on('riotAccountLinked', (data) => {
     const statusDiv = document.getElementById('linkingStatus');
     
     if (data.success) {
+        console.log('Riot account linked successfully:', data.championPool);
+        
         statusDiv.innerHTML = `<span style="color: #5cb85c;">✅ ${data.message}</span>`;
         
         const pendingAction = gameState.pendingAction;
@@ -902,23 +1052,32 @@ socket.on('riotAccountLinked', (data) => {
         setTimeout(() => {
             document.querySelector('.riot-account-modal').remove();
             
-            // Use Riot summoner name instead of entered name
-            const riotName = data.championPool.summonerName;
+            let playerName = data.championPool?.summonerName;
+            
+            if (!playerName || playerName === 'undefined') {
+                const riotId = document.getElementById('riotId').value.trim();
+                const [gameName] = riotId.split('#');
+                playerName = gameName || pendingAction.playerName;
+            }
+            
+            console.log(`Using player name: ${playerName}`);
+            console.log(`Champion pool size: ${data.championPool?.championIds?.length || 0}`);
             
             if (pendingAction.action === 'create') {
                 socket.emit('createRoom', { 
-                    playerName: riotName,
-                    championPool: data.championPool.championIds
+                    playerName: playerName,
+                    championPool: data.championPool?.championIds || [],
+                    riotData: data.riotData
                 });
             } else {
                 socket.emit('joinRoom', { 
                     roomCode: pendingAction.roomCode,
-                    playerName: riotName,
-                    championPool: data.championPool.championIds
+                    playerName: playerName,
+                    championPool: data.championPool?.championIds || [],
+                    riotData: data.riotData
                 });
             }
             
-            // Clear pending action
             gameState.pendingAction = null;
         }, 1500);
         
@@ -926,3 +1085,387 @@ socket.on('riotAccountLinked', (data) => {
         statusDiv.innerHTML = `<span style="color: #d9534f;">❌ ${data.error}</span>`;
     }
 });
+
+const styles = `
+.champion-winrate {
+    margin-top: 4px;
+    min-height: 16px;
+}
+
+.champion-winrate span {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.3);
+}
+`;
+
+const styleSheet = document.createElement('style');
+styleSheet.textContent = styles;
+document.head.appendChild(styleSheet);
+
+function manageChampionPool(action, playerName, roomCode) {
+    console.log('Manage Champion Pool clicked!', { action, playerName, roomCode });
+    
+    const riotId = document.getElementById('riotId');
+    const region = document.getElementById('riotRegion');
+    const statusDiv = document.getElementById('linkingStatus');
+    
+    if (!riotId || !riotId.value.trim() || !riotId.value.includes('#')) {
+        statusDiv.innerHTML = '<span style="color: #d9534f;">Please enter a valid Riot ID first</span>';
+        return;
+    }
+    
+    statusDiv.innerHTML = '<span style="color: #c89b3c;">🔄 Linking account to manage champion pool...</span>';
+    
+    // First link the account to get real PUUID, then open champion pool
+    gameState.pendingAction = { 
+        action: 'championPool', 
+        playerName: playerName, 
+        roomCode: roomCode,
+        originalAction: action
+    };
+    
+    const riotData = {
+        riotId: riotId.value.trim(),
+        region: region.value
+    };
+    
+    socket.emit('linkRiotAccount', riotData);
+}
+
+function showChampionPoolManager(userData) {
+    const existingModal = document.querySelector('.champion-pool-modal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    const modal = document.createElement('div');
+    modal.className = 'champion-pool-modal';
+    modal.innerHTML = `
+        <div class="champion-pool-content">
+            <div class="champion-pool-header">
+                <h3>Manage Your Champion Pool</h3>
+                <p>Select the champions you own to create your personalized champion pool</p>
+                <div class="pool-stats">
+                    <span>Selected: <strong id="selectedCount">0</strong></span>
+                    <span>Total: <strong id="totalCount">0</strong></span>
+                    <span>Account: <strong id="accountName">${userData.summonerName || 'Not linked'}</strong></span>
+                </div>
+            </div>
+
+            <div id="loadingIndicator" class="loading-indicator">
+                Loading champions...
+            </div>
+
+            <div id="errorMessage" class="error-message" style="display: none;"></div>
+            <div id="successMessage" class="success-message" style="display: none;"></div>
+
+            <div id="championPoolContent" style="display: none;">
+                <div class="search-section">
+                    <input type="text" id="championSearch" class="search-input" placeholder="Search champions..." />
+                </div>
+
+                <div id="championGrid" class="champion-grid">
+                </div>
+
+                <div class="pool-actions">
+                    <button class="pool-btn select-all" id="selectAllBtn">Select All</button>
+                    <button class="pool-btn save" id="savePoolBtn">Save Champion Pool</button>
+                    <button class="pool-btn cancel" id="cancelPoolBtn">Cancel</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    initializeChampionPool(userData);
+}
+
+function initializeChampionPool(userData) {
+    let allChampions = [];
+    let selectedChampions = new Set();
+
+    async function loadChampionPool() {
+        const loadingEl = document.getElementById('loadingIndicator');
+        const contentEl = document.getElementById('championPoolContent');
+        const errorEl = document.getElementById('errorMessage');
+
+        try {
+            loadingEl.style.display = 'block';
+            contentEl.style.display = 'none';
+            errorEl.style.display = 'none';
+
+            console.log('🔄 Loading champions and existing pool...');
+            
+            // Load all available champions
+            const championsResponse = await fetch('/api/champions');
+            if (!championsResponse.ok) {
+                throw new Error(`Failed to load champions: ${championsResponse.status}`);
+            }
+            
+            allChampions = await championsResponse.json();
+            console.log(`✅ Loaded ${allChampions.length} total champions`);
+            
+            // Clear selection first
+            selectedChampions.clear();
+            
+            // Load existing saved champion pool
+            if (userData.puuid && !userData.puuid.startsWith('temp_')) {
+                console.log(`🔍 Loading existing champion pool for PUUID: ${userData.puuid}`);
+                
+                try {
+                    const poolResponse = await fetch(`/api/champion-pool/${userData.puuid}`);
+                    if (poolResponse.ok) {
+                        const existingPool = await poolResponse.json();
+                        console.log(`📋 Found existing pool: ${existingPool.length} champions`);
+                        
+                        if (existingPool.length > 0) {
+                            console.log(`First 5 saved champions: ${existingPool.slice(0, 5).map(c => c.champion_name)}`);
+                            
+                            // Pre-select all saved champions
+                            existingPool.forEach(savedChamp => {
+                                selectedChampions.add(savedChamp.champion_name);
+                            });
+                            
+                            console.log(`✅ Pre-selected ${selectedChampions.size} champions from database`);
+                            console.log(`Pre-selected champions: ${Array.from(selectedChampions).slice(0, 10)}`);
+                        } else {
+                            console.log('📋 Existing pool is empty');
+                        }
+                    } else {
+                        console.log('📋 No existing champion pool found in database');
+                    }
+                } catch (poolError) {
+                    console.error('❌ Error loading existing pool:', poolError);
+                }
+            } else {
+                console.log('⚠️  Using temporary PUUID, no existing pool to load');
+            }
+            
+            // Render the grid with pre-selections
+            renderChampionGrid();
+            updateStats();
+
+            loadingEl.style.display = 'none';
+            contentEl.style.display = 'block';
+
+        } catch (error) {
+            console.error('❌ Error loading champion pool:', error);
+            showError(`Failed to load champions: ${error.message}`);
+            loadingEl.style.display = 'none';
+        }
+    }
+
+    function renderChampionGrid(filter = '') {
+        const grid = document.getElementById('championGrid');
+        if (!grid) return;
+        
+        grid.innerHTML = '';
+
+        const filteredChampions = allChampions.filter(champ => 
+            champ.name.toLowerCase().includes(filter.toLowerCase())
+        );
+
+        console.log(`🎨 Rendering ${filteredChampions.length} champions (${selectedChampions.size} pre-selected)`);
+
+        filteredChampions.forEach(champion => {
+            const card = createChampionCard(champion);
+            grid.appendChild(card);
+        });
+    }
+
+    function createChampionCard(champion) {
+        const card = document.createElement('div');
+        card.className = 'champion-card';
+        
+        // Check if this champion is in the selected set
+        const isSelected = selectedChampions.has(champion.name);
+        if (isSelected) {
+            card.classList.add('selected');
+        }
+
+        card.innerHTML = `
+            <img src="https://ddragon.leagueoflegends.com/cdn/13.24.1/img/champion/${champion.id}.png" 
+                 alt="${champion.name}" 
+                 onerror="this.style.display='none';">
+            <div class="champion-name">${champion.name}</div>
+            ${isSelected ? '<div class="selected-indicator">✓</div>' : ''}
+        `;
+
+        card.addEventListener('click', () => toggleChampion(champion.name, card));
+        return card;
+    }
+
+    function toggleChampion(championName, cardElement) {
+        if (selectedChampions.has(championName)) {
+            // Deselect
+            selectedChampions.delete(championName);
+            cardElement.classList.remove('selected');
+            const indicator = cardElement.querySelector('.selected-indicator');
+            if (indicator) indicator.remove();
+            console.log(`❌ Deselected: ${championName}`);
+        } else {
+            // Select
+            selectedChampions.add(championName);
+            cardElement.classList.add('selected');
+            const indicator = document.createElement('div');
+            indicator.className = 'selected-indicator';
+            indicator.textContent = '✓';
+            cardElement.appendChild(indicator);
+            console.log(`✅ Selected: ${championName}`);
+        }
+        updateStats();
+    }
+
+    function updateStats() {
+        const selectedEl = document.getElementById('selectedCount');
+        const totalEl = document.getElementById('totalCount');
+        if (selectedEl) selectedEl.textContent = selectedChampions.size;
+        if (totalEl) totalEl.textContent = allChampions.length;
+    }
+
+    function selectAllChampions() {
+        console.log('🎯 Selecting all champions');
+        selectedChampions.clear();
+        allChampions.forEach(champ => selectedChampions.add(champ.name));
+        const searchValue = document.getElementById('championSearch')?.value || '';
+        renderChampionGrid(searchValue);
+        updateStats();
+    }
+
+    async function saveChampionPool() {
+        const saveBtn = document.getElementById('savePoolBtn');
+        if (!saveBtn) return;
+        
+        const originalText = saveBtn.textContent;
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+
+        try {
+            const championPool = allChampions.filter(champ => 
+                selectedChampions.has(champ.name)
+            );
+
+            console.log(`💾 Saving ${championPool.length} champions for ${userData.summonerName}`);
+            console.log(`Selected champions: ${Array.from(selectedChampions).slice(0, 10)}`);
+
+            const response = await fetch('/api/save-champion-pool', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    puuid: userData.puuid,
+                    summonerName: userData.summonerName,
+                    region: userData.region,
+                    championPool: championPool
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to save champion pool');
+            }
+
+            const result = await response.json();
+            console.log('💾 Save response:', result);
+
+            showSuccess(`Champion pool saved! ${selectedChampions.size} champions selected.`);
+            
+            // Don't auto-close, let user decide when to close
+            setTimeout(() => {
+                if (userData.action && userData.playerName) {
+                    showSuccess(`Champion pool saved! Now proceeding to ${userData.action} game...`);
+                    
+                    setTimeout(() => {
+                        hideChampionPoolModal();
+                        
+                        // Proceed with the original action
+                        if (userData.action === 'create') {
+                            socket.emit('createRoom', { 
+                                playerName: userData.playerName,
+                                championPool: championPool.map(c => c.name),
+                                riotData: {
+                                    puuid: userData.puuid,
+                                    region: userData.region
+                                }
+                            });
+                        } else if (userData.action === 'join') {
+                            socket.emit('joinRoom', { 
+                                roomCode: userData.roomCode,
+                                playerName: userData.playerName,
+                                championPool: championPool.map(c => c.name),
+                                riotData: {
+                                    puuid: userData.puuid,
+                                    region: userData.region
+                                }
+                            });
+                        }
+                    }, 1500);
+                }
+            }, 1000);
+
+        } catch (error) {
+            console.error('❌ Error saving champion pool:', error);
+            showError(`Failed to save champion pool: ${error.message}`);
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = originalText;
+        }
+    }
+
+    function showError(message) {
+        const errorEl = document.getElementById('errorMessage');
+        if (errorEl) {
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+            
+            setTimeout(() => {
+                errorEl.style.display = 'none';
+            }, 5000);
+        }
+    }
+
+    function showSuccess(message) {
+        const successEl = document.getElementById('successMessage');
+        if (successEl) {
+            successEl.textContent = message;
+            successEl.style.display = 'block';
+        }
+    }
+
+    function hideChampionPoolModal() {
+        const modal = document.querySelector('.champion-pool-modal');
+        if (modal) {
+            modal.remove();
+        }
+    }
+
+    // Event listeners
+    const searchInput = document.getElementById('championSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            renderChampionGrid(e.target.value);
+        });
+    }
+
+    const selectAllBtn = document.getElementById('selectAllBtn');
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', selectAllChampions);
+    }
+
+    const saveBtn = document.getElementById('savePoolBtn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', saveChampionPool);
+    }
+
+    const cancelBtn = document.getElementById('cancelPoolBtn');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', hideChampionPoolModal);
+    }
+
+    // Start loading
+    console.log('🚀 Initializing champion pool for:', userData.summonerName);
+    loadChampionPool();
+}
