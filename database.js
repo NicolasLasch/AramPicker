@@ -5,7 +5,6 @@ async function getAllChampionsFromRiot() {
     try {
         const https = require('https');
         
-        // First, get the latest version
         console.log('🔍 Fetching latest Data Dragon version...');
         const latestVersion = await new Promise((resolve, reject) => {
             const req = https.get('https://ddragon.leagueoflegends.com/api/versions.json', (res) => {
@@ -14,7 +13,7 @@ async function getAllChampionsFromRiot() {
                 res.on('end', () => {
                     try {
                         const versions = JSON.parse(data);
-                        resolve(versions[0]); // Latest version is first
+                        resolve(versions[0]); 
                     } catch (e) {
                         reject(e);
                     }

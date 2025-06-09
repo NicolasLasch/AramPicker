@@ -6,6 +6,19 @@ const socket = io(socketUrl, {
     rememberUpgrade: true
 });
 
+let LATEST_VERSION = '15.11.1'; // fallback
+
+async function fetchLatestVersion() {
+    try {
+        const response = await fetch('https://ddragon.leagueoflegends.com/api/versions.json');
+        const versions = await response.json();
+        LATEST_VERSION = versions[0]; // First version is the latest
+        console.log(`✅ Loaded latest Data Dragon version: ${LATEST_VERSION}`);
+    } catch (error) {
+        console.error('Failed to fetch latest version, using fallback:', error);
+    }
+}
+
 // Store game state in sessionStorage to persist across page reloads
 function saveGameSession() {
     if (gameState.roomCode && gameState.playerName) {
@@ -668,7 +681,7 @@ function createChampionPortrait(champion, onClick) {
     
     if (champion) {
         const img = document.createElement('img');
-        img.src = `https://ddragon.leagueoflegends.com/cdn/13.24.1/img/champion/${champion.id}.png`;
+        img.src = `https://ddragon.leagueoflegends.com/cdn/${LATEST_VERSION}/img/champion/${champion.id}.png`;
         img.style.width = '100%';
         img.style.height = '100%';
         img.style.objectFit = 'cover';
@@ -748,7 +761,7 @@ function createBenchChampionCard(champion) {
     card.className = 'bench-champion';
     
     const img = document.createElement('img');
-    img.src = `https://ddragon.leagueoflegends.com/cdn/13.24.1/img/champion/${champion.id}.png`;
+    img.src = `https://ddragon.leagueoflegends.com/cdn/${LATEST_VERSION}/img/champion/${champion.id}.png`;
     img.alt = champion.name;
     img.onerror = function() {
         this.style.display = 'none';
@@ -826,7 +839,7 @@ function showGameComplete() {
         summary += '<div class="team-result blue"><h4>Blue Team:</h4>';
         blueTeam.forEach(p => {
             const champImage = p.champion ? 
-                `<img src="https://ddragon.leagueoflegends.com/cdn/13.24.1/img/champion/${p.champion.id}.png" 
+                `<img src="https://ddragon.leagueoflegends.com/cdn/${LATEST_VERSION}/img/champion/${p.champion.id}.png" 
                       style="width: 32px; height: 32px; border-radius: 4px; margin-right: 8px; vertical-align: middle;"
                       onerror="this.style.display='none'">` : '';
             summary += `<div style="margin: 8px 0; display: flex; align-items: center;">
@@ -841,7 +854,7 @@ function showGameComplete() {
         summary += '<div class="team-result red"><h4>Red Team:</h4>';
         redTeam.forEach(p => {
             const champImage = p.champion ? 
-                `<img src="https://ddragon.leagueoflegends.com/cdn/13.24.1/img/champion/${p.champion.id}.png" 
+                `<img src="https://ddragon.leagueoflegends.com/cdn/${LATEST_VERSION}/img/champion/${p.champion.id}.png" 
                       style="width: 32px; height: 32px; border-radius: 4px; margin-right: 8px; vertical-align: middle;"
                       onerror="this.style.display='none'">` : '';
             summary += `<div style="margin: 8px 0; display: flex; align-items: center;">
@@ -891,8 +904,10 @@ function backToMenu() {
     elements.roomCode.value = '';
 }
 
-// Initialize everything when the page loads
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Load latest version first
+    await fetchLatestVersion();
+    
     initializeElements();
     setupEventListeners();
     setupSocketListeners();
@@ -1279,16 +1294,15 @@ function initializeChampionPool(userData) {
         const card = document.createElement('div');
         card.className = 'champion-card';
         
-        // Check if this champion is in the selected set
         const isSelected = selectedChampions.has(champion.name);
         if (isSelected) {
             card.classList.add('selected');
         }
 
         card.innerHTML = `
-            <img src="https://ddragon.leagueoflegends.com/cdn/13.24.1/img/champion/${champion.id}.png" 
-                 alt="${champion.name}" 
-                 onerror="this.style.display='none';">
+            <img src="https://ddragon.leagueoflegends.com/cdn/${LATEST_VERSION}/img/champion/${champion.id}.png" 
+                alt="${champion.name}" 
+                onerror="this.style.display='none';">
             <div class="champion-name">${champion.name}</div>
             ${isSelected ? '<div class="selected-indicator">✓</div>' : ''}
         `;
