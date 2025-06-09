@@ -137,18 +137,47 @@ async function getRiotChampionPool(riotId, region) {
 }
 
 function estimateAdditionalChampions(summonerLevel, masteryCount) {
-    // Rough estimation based on typical player progression
+    
+    const baseChampions = 20;
+    
+    let levelBasedChampions = 0;
+    if (summonerLevel >= 30) {
+        // Level 30+ players typically have many champions
+        levelBasedChampions = Math.min(Math.floor(summonerLevel * 1.2), 100);
+    }
+    
+    // Estimate based on mastery count (more mastery = more champions)
+    const masteryBasedChampions = Math.min(masteryCount * 2, 50);
+    
+    // High level accounts likely have most/all champions
+    if (summonerLevel >= 100) {
+        levelBasedChampions = Math.min(120 + Math.floor((summonerLevel - 100) * 0.8), 166);
+    }
+    
+    const totalEstimated = 166;
+    
+    console.log(`Champion estimation for level ${summonerLevel}:`);
+    console.log(`  - Base: ${baseChampions}`);
+    console.log(`  - Level-based: ${levelBasedChampions}`);
+    console.log(`  - Mastery-based: ${masteryBasedChampions}`);
+    console.log(`  - Total estimated: ${totalEstimated}`);
+    
+    // Get popular champions to fill the estimation
     const popularChampionIds = [
-        1, 22, 51, 69, 31, 36, 81, 61, 74, 85, 121, 11, 21, 37, 16, 
-        99, 90, 20, 2, 14, 15, 72, 27, 86, 75, 103, 84, 120, 96
+        1, 22, 51, 69, 31, 36, 81, 61, 74, 85, 121, 11, 21, 37, 16,
+        99, 90, 20, 2, 14, 15, 72, 27, 86, 75, 103, 84, 120, 96, 77,
+        25, 53, 18, 32, 92, 104, 24, 34, 39, 40, 41, 42, 43, 44, 45,
+        112, 8, 106, 19, 62, 101, 5, 115, 26, 91, 3, 79, 114, 122,
+        136, 127, 13, 33, 58, 113, 35, 60, 28, 38, 55, 10, 85, 121,
+        131, 9, 30, 38, 55, 10, 4, 31, 6, 7, 23, 63, 89, 17, 18, 48,
+        68, 102, 23, 29, 56, 78, 80, 133, 497, 498, 516, 517, 518,
+        141, 142, 143, 145, 150, 154, 157, 161, 163, 164, 166, 200,
+        201, 202, 203, 222, 223, 234, 235, 236, 238, 240, 245, 246,
+        254, 266, 267, 268, 350, 360, 412, 420, 421, 427, 429, 432,
+        526, 555, 711, 777, 875, 876, 887, 888, 895, 897, 902, 950
     ];
     
-    let estimatedOwned = Math.min(
-        Math.floor(summonerLevel / 3) + Math.floor(masteryCount * 1.5),
-        popularChampionIds.length
-    );
-    
-    return popularChampionIds.slice(0, estimatedOwned);
+    return popularChampionIds.slice(0, Math.max(0, totalEstimated - baseChampions));
 }
 
 async function convertChampionIdsToNames(championIds) {
@@ -516,7 +545,19 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('startGame', async (roomCode) => {
+    socket.on('startGame', async (data) => {
+        let roomCode, rerollTokens;
+        
+        if (typeof data === 'string') {
+            // Old format - just room code
+            roomCode = data;
+            rerollTokens = 1; // default
+        } else {
+            // New format - object with settings
+            roomCode = data.roomCode;
+            rerollTokens = data.rerollTokens || 1;
+        }
+        
         const room = gameRooms.get(roomCode);
         
         if (!room || room.hostId !== socket.id) {
@@ -525,7 +566,8 @@ io.on('connection', (socket) => {
         }
 
         try {
-            await room.startChampionSelect();
+            console.log(`Starting game with ${rerollTokens} reroll tokens per player`);
+            await room.startChampionSelect(rerollTokens);
             sendPersonalizedGameStart(room);
             console.log(`Game started in room ${roomCode}`);
         } catch (error) {

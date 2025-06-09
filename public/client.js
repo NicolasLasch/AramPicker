@@ -129,6 +129,16 @@ function setupEventListeners() {
     elements.roomCode.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') joinGame();
     });
+
+    const rerollSlider = document.getElementById('rerollTokens');
+    const rerollValue = document.getElementById('rerollValue');
+    
+    if (rerollSlider && rerollValue) {
+        rerollSlider.addEventListener('input', (e) => {
+            rerollValue.textContent = e.target.value;
+            gameState.rerollTokens = parseInt(e.target.value);
+        });
+    }
     
     elements.roomCode.addEventListener('input', (e) => {
         e.target.value = e.target.value.toUpperCase();
@@ -285,7 +295,11 @@ function joinTeam(team) {
 }
 
 function startChampionSelect() {
-    socket.emit('startGame', gameState.roomCode);
+    const rerollTokens = gameState.rerollTokens || 1;
+    socket.emit('startGame', { 
+        roomCode: gameState.roomCode, 
+        rerollTokens: rerollTokens 
+    });
 }
 
 function rerollChampion() {
@@ -325,8 +339,20 @@ function showLobby() {
     
     elements.displayRoomCode.textContent = gameState.roomCode;
     
+    // Show/hide host-only elements
+    const rerollSettings = document.getElementById('rerollSettings');
+    const startButton = elements.startGameBtn;
+    
     if (gameState.isHost) {
-        elements.startGameBtn.classList.remove('hidden');
+        startButton.classList.remove('hidden');
+        if (rerollSettings) {
+            rerollSettings.style.display = 'block';
+        }
+    } else {
+        startButton.classList.add('hidden');
+        if (rerollSettings) {
+            rerollSettings.style.display = 'none';
+        }
     }
     
     updateLobbyDisplay();

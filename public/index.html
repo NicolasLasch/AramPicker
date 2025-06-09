@@ -38,6 +38,20 @@
             <div>Room Code: <span class="room-code" id="displayRoomCode"></span></div>
             <p>Share this code with your friends to join!</p>
             <div id="playerCount">Players: <span id="playerCountNumber">0</span>/10</div>
+            
+            <!-- NEW: Reroll Token Settings -->
+            <div class="reroll-settings" id="rerollSettings">
+                <h4>Game Settings (Host Only)</h4>
+                <div class="setting-group">
+                    <label for="rerollTokens">Reroll Tokens per Player:</label>
+                    <div class="slider-container">
+                        <input type="range" id="rerollTokens" min="1" max="5" value="2" class="reroll-slider">
+                        <span id="rerollValue">2</span>
+                    </div>
+                    <small>Higher = more rerolls = less authentic ARAM experience</small>
+                </div>
+            </div>
+            
             <button id="startGameBtn" class="menu-button hidden">Start Champion Select</button>
         </div>
 

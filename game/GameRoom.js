@@ -144,10 +144,10 @@ class GameRoom {
         return Array.from(this.players.values()).filter(p => p.team === team);
     }
 
-    async startChampionSelect() {
+    async startChampionSelect(rerollTokens = 2) {
         const playersWithTeams = Array.from(this.players.values()).filter(p => p.team);
-        const blueTeam = Array.from(this.players.values()).filter(p => p.team === 'blue');
-        const redTeam = Array.from(this.players.values()).filter(p => p.team === 'red');
+        const blueTeam = playersWithTeams.filter(p => p.team === 'blue');
+        const redTeam = playersWithTeams.filter(p => p.team === 'red');
         
         if (blueTeam.length === 0) {
             throw new Error('Blue team needs at least 1 player');
@@ -166,7 +166,14 @@ class GameRoom {
         
         this.gamePhase = 'champion-select';
         
-        // Assign random champions to all players
+        // Set reroll tokens for all players
+        playersWithTeams.forEach(player => {
+            player.rerollTokens = rerollTokens;
+        });
+        
+        console.log(`Set ${rerollTokens} reroll tokens for all players`);
+        
+        // Assign random champions
         this.assignRandomChampions();
         
         // Initialize empty team benches
