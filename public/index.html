@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARAM Pick System - Multiplayer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="header">
+        <h1>ARAM Pick System</h1>
+        <p>League of Legends Custom ARAM - Multiplayer</p>
+        <div id="connectionStatus" class="connection-status">Connecting...</div>
+    </div>
+
+    <div id="mainMenu" class="main-menu">
+        <h2 style="margin-bottom: 30px;">Join or Create Game</h2>
+        
+        <div class="input-section">
+            <h3>Create New Game</h3>
+            <input type="text" id="playerName" class="input-field" placeholder="Enter your name" maxlength="16">
+            <br>
+            <button class="menu-button" id="createGameBtn">Create Game</button>
+        </div>
+
+        <div class="input-section">
+            <h3>Join Existing Game</h3>
+            <input type="text" id="joinPlayerName" class="input-field" placeholder="Enter your name" maxlength="16">
+            <input type="text" id="roomCode" class="input-field" placeholder="Enter room code" maxlength="6" style="text-transform: uppercase;">
+            <br>
+            <button class="menu-button" id="joinGameBtn">Join Game</button>
+        </div>
+    </div>
+
+    <div id="lobbyScreen" class="lobby-screen hidden">
+        <div class="room-info">
+            <h2>Game Lobby</h2>
+            <div>Room Code: <span class="room-code" id="displayRoomCode"></span></div>
+            <p>Share this code with your friends to join!</p>
+            <div id="playerCount">Players: <span id="playerCountNumber">0</span>/10</div>
+            <button id="startGameBtn" class="menu-button hidden">Start Champion Select</button>
+        </div>
+
+        <div class="teams-lobby">
+            <div class="team-lobby blue">
+                <h3 style="text-align: center; color: #5bc0de;">Blue Team</h3>
+                <button class="join-team-btn" id="joinBlueBtn">Join Blue Team</button>
+                <div id="blueTeamLobby" class="player-list"></div>
+            </div>
+            <div class="team-lobby red">
+                <h3 style="text-align: center; color: #d9534f;">Red Team</h3>
+                <button class="join-team-btn" id="joinRedBtn">Join Red Team</button>
+                <div id="redTeamLobby" class="player-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="gameInterface" class="game-interface hidden">
+        <div class="timer-section">
+            <div class="phase-indicator" id="phaseIndicator">Champion Select Phase</div>
+            <div class="timer" id="timer">90</div>
+        </div>
+
+        <div class="instructions">
+            <p><strong>ARAM Rules:</strong> You have a random champion. Use reroll to get a new random champion (puts old one in bench). Swap with bench champions or trade with teammates!</p>
+        </div>
+
+        <div class="teams-container">
+            <div class="team-side blue">
+                <h3 style="text-align: center; margin-bottom: 15px; color: #5bc0de;">Blue Team</h3>
+                <div id="blueTeam"></div>
+            </div>
+            <div class="team-side red">
+                <h3 style="text-align: center; margin-bottom: 15px; color: #d9534f;">Red Team</h3>
+                <div id="redTeam"></div>
+            </div>
+        </div>
+
+        <div class="bench-section">
+            <div class="bench-title">Team Bench - Available Champions</div>
+            <div id="benchChampions" class="bench-champions"></div>
+        </div>
+    </div>
+
+    <div id="tradeRequest" class="trade-request hidden">
+        <h3>Trade Request</h3>
+        <p id="tradeMessage"></p>
+        <div style="margin-top: 15px;">
+            <button class="menu-button" id="acceptTradeBtn">Accept</button>
+            <button class="menu-button decline-btn" id="declineTradeBtn">Decline</button>
+        </div>
+    </div>
+
+    <div id="errorModal" class="error-modal hidden">
+        <div class="error-content">
+            <h3>Error</h3>
+            <p id="errorMessage"></p>
+            <button class="menu-button" id="closeErrorBtn">OK</button>
+        </div>
+    </div>
+
+    <div id="successModal" class="success-modal hidden">
+        <div class="success-content">
+            <h3>Game Complete!</h3>
+            <div id="finalTeams"></div>
+            <button class="menu-button" id="backToMenuBtn">Back to Menu</button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="client.js"></script>
+</body>
+</html>

@@ -1,0 +1,232 @@
+[
+  {
+    "id": "ahri",
+    "name": "Ahri",
+    "title": "the Nine-Tailed Fox"
+  },
+  {
+    "id": "akali",
+    "name": "Akali",
+    "title": "the Rogue Assassin"
+  },
+  {
+    "id": "ashe",
+    "name": "Ashe",
+    "title": "the Frost Archer"
+  },
+  {
+    "id": "azir",
+    "name": "Azir",
+    "title": "the Emperor of the Sands"
+  },
+  {
+    "id": "brand",
+    "name": "Brand",
+    "title": "the Burning Vengeance"
+  },
+  {
+    "id": "caitlyn",
+    "name": "Caitlyn",
+    "title": "the Sheriff of Piltover"
+  },
+  {
+    "id": "darius",
+    "name": "Darius",
+    "title": "the Hand of Noxus"
+  },
+  {
+    "id": "diana",
+    "name": "Diana",
+    "title": "Scorn of the Moon"
+  },
+  {
+    "id": "ezreal",
+    "name": "Ezreal",
+    "title": "the Prodigal Explorer"
+  },
+  {
+    "id": "fiora",
+    "name": "Fiora",
+    "title": "the Grand Duelist"
+  },
+  {
+    "id": "garen",
+    "name": "Garen",
+    "title": "the Might of Demacia"
+  },
+  {
+    "id": "graves",
+    "name": "Graves",
+    "title": "the Outlaw"
+  },
+  {
+    "id": "heimerdinger",
+    "name": "Heimerdinger",
+    "title": "the Revered Inventor"
+  },
+  {
+    "id": "irelia",
+    "name": "Irelia",
+    "title": "the Blade Dancer"
+  },
+  {
+    "id": "jax",
+    "name": "Jax",
+    "title": "Grandmaster at Arms"
+  },
+  {
+    "id": "jinx",
+    "name": "Jinx",
+    "title": "the Loose Cannon"
+  },
+  {
+    "id": "karma",
+    "name": "Karma",
+    "title": "the Enlightened One"
+  },
+  {
+    "id": "katarina",
+    "name": "Katarina",
+    "title": "the Sinister Blade"
+  },
+  {
+    "id": "leblanc",
+    "name": "LeBlanc",
+    "title": "the Deceiver"
+  },
+  {
+    "id": "leesin",
+    "name": "Lee Sin",
+    "title": "the Blind Monk"
+  },
+  {
+    "id": "lux",
+    "name": "Lux",
+    "title": "the Lady of Luminosity"
+  },
+  {
+    "id": "malphite",
+    "name": "Malphite",
+    "title": "Shard of the Monolith"
+  },
+  {
+    "id": "masteryi",
+    "name": "Master Yi",
+    "title": "the Wuju Bladesman"
+  },
+  {
+    "id": "morgana",
+    "name": "Morgana",
+    "title": "the Fallen"
+  },
+  {
+    "id": "nasus",
+    "name": "Nasus",
+    "title": "the Curator of the Sands"
+  },
+  {
+    "id": "orianna",
+    "name": "Orianna",
+    "title": "the Lady of Clockwork"
+  },
+  {
+    "id": "pantheon",
+    "name": "Pantheon",
+    "title": "the Unbreakable Spear"
+  },
+  {
+    "id": "quinn",
+    "name": "Quinn",
+    "title": "Demacia's Wings"
+  },
+  {
+    "id": "riven",
+    "name": "Riven",
+    "title": "the Exile"
+  },
+  {
+    "id": "sona",
+    "name": "Sona",
+    "title": "Maven of the Strings"
+  },
+  {
+    "id": "teemo",
+    "name": "Teemo",
+    "title": "the Swift Scout"
+  },
+  {
+    "id": "thresh",
+    "name": "Thresh",
+    "title": "the Chain Warden"
+  },
+  {
+    "id": "urgot",
+    "name": "Urgot",
+    "title": "the Dreadnought"
+  },
+  {
+    "id": "vayne",
+    "name": "Vayne",
+    "title": "the Night Hunter"
+  },
+  {
+    "id": "wukong",
+    "name": "Wukong",
+    "title": "the Monkey King"
+  },
+  {
+    "id": "xerath",
+    "name": "Xerath",
+    "title": "the Magus Ascendant"
+  },
+  {
+    "id": "yasuo",
+    "name": "Yasuo",
+    "title": "the Unforgiven"
+  },
+  {
+    "id": "zed",
+    "name": "Zed",
+    "title": "the Master of Shadows"
+  },
+  {
+    "id": "annie",
+    "name": "Annie",
+    "title": "the Dark Child"
+  },
+  {
+    "id": "blitzcrank",
+    "name": "Blitzcrank",
+    "title": "the Great Steam Golem"
+  },
+  {
+    "id": "braum",
+    "name": "Braum",
+    "title": "the Heart of the Freljord"
+  },
+  {
+    "id": "corki",
+    "name": "Corki",
+    "title": "the Daring Bombardier"
+  },
+  {
+    "id": "draven",
+    "name": "Draven",
+    "title": "the Glorious Executioner"
+  },
+  {
+    "id": "elise",
+    "name": "Elise",
+    "title": "the Spider Queen"
+  },
+  {
+    "id": "fiddlesticks",
+    "name": "Fiddlesticks",
+    "title": "the Harbinger of Doom"
+  },
+  {
+    "id": "gangplank",
+    "name": "Gangplank",
+    "title": "the Saltwater Scourge"
+  }
+]
