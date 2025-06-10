@@ -614,9 +614,21 @@ function createRoom(hostSocket, playerName) {
 
 function sendPersonalizedUpdates(room) {
     room.players.forEach((player, playerId) => {
-        const playerSocket = player.socket;
-        if (playerSocket) {
+        let playerSocket = player.socket;
+        
+        // Ensure socket is still connected, if not try to find it
+        if (!playerSocket || !playerSocket.connected) {
+            const allSockets = io.sockets.sockets;
+            playerSocket = allSockets.get(playerId);
+            if (playerSocket) {
+                player.socket = playerSocket; // Update reference
+            }
+        }
+        
+        if (playerSocket && playerSocket.connected) {
             playerSocket.emit('gameStateUpdate', room.getGameStateForPlayer(playerId));
+        } else {
+            console.log(`⚠️ Could not send update to ${player.name} - socket not available`);
         }
     });
 }
@@ -878,16 +890,18 @@ io.on('connection', (socket) => {
     });
 
     socket.on('startGame', async (data) => {
-        let roomCode, rerollTokens;
+        let roomCode, rerollTokens, draftMode;
         
         if (typeof data === 'string') {
             // Old format - just room code
             roomCode = data;
-            rerollTokens = 1; // default
+            rerollTokens = 1;
+            draftMode = 'aram';
         } else {
             // New format - object with settings
             roomCode = data.roomCode;
             rerollTokens = data.rerollTokens || 1;
+            draftMode = data.draftMode || 'aram';
         }
         
         const room = gameRooms.get(roomCode);
@@ -898,12 +912,17 @@ io.on('connection', (socket) => {
         }
 
         try {
-            console.log(`Starting game with ${rerollTokens} reroll tokens per player`);
-            await room.startChampionSelect(rerollTokens);
+            console.log(`🎮 Starting game with mode: ${draftMode}, rerolls: ${rerollTokens}`);
+            
+            await room.startChampionSelect({
+                rerollTokens: rerollTokens,
+                draftMode: draftMode
+            });
+            
             sendPersonalizedGameStart(room);
-            console.log(`Game started in room ${roomCode}`);
+            console.log(`✅ Game started in room ${roomCode} with ${draftMode} mode`);
         } catch (error) {
-            console.error(`Error starting game in room ${roomCode}:`, error.message);
+            console.error(`❌ Error starting game in room ${roomCode}:`, error.message);
             socket.emit('error', error.message);
         }
     });
@@ -920,6 +939,52 @@ io.on('connection', (socket) => {
             room.rerollChampion(socket.id);
             sendPersonalizedUpdates(room);
         } catch (error) {
+            socket.emit('error', error.message);
+        }
+    });
+
+    socket.on('pickCard', (data) => {
+        const { roomCode, cardIndex } = data;
+        const room = gameRooms.get(roomCode);
+        
+        if (!room || !room.players.has(socket.id)) {
+            socket.emit('error', 'Invalid room or player');
+            return;
+        }
+
+        try {
+            console.log(`Player ${socket.id} picking card ${cardIndex} in room ${roomCode}`);
+            room.pickCard(socket.id, cardIndex);
+            sendPersonalizedUpdates(room);
+            
+            // Check if all players have picked
+            const playersWithTeams = Array.from(room.players.values()).filter(p => p.team);
+            const allPicked = playersWithTeams.every(p => p.hasPicked || p.champion);
+            
+            if (allPicked) {
+                console.log('All players have picked their cards');
+            }
+        } catch (error) {
+            console.error('Error in pickCard:', error);
+            socket.emit('error', error.message);
+        }
+    });
+
+    socket.on('placeBid', (data) => {
+        const { roomCode, bidAmount } = data;
+        const room = gameRooms.get(roomCode);
+        
+        if (!room || !room.players.has(socket.id)) {
+            socket.emit('error', 'Invalid room or player');
+            return;
+        }
+
+        try {
+            console.log(`Player ${socket.id} placing bid ${bidAmount} in room ${roomCode}`);
+            room.placeBid(socket.id, bidAmount);
+            // broadcastAuctionUpdate is called inside placeBid method
+        } catch (error) {
+            console.error('Error in placeBid:', error);
             socket.emit('error', error.message);
         }
     });
@@ -972,26 +1037,57 @@ io.on('connection', (socket) => {
         }
 
         try {
+            console.log(`🔄 Trade offer from ${socket.id} to ${targetPlayerId} in room ${roomCode}`);
+            console.log(`   - Draft mode: ${room.currentDraftMode}`);
+            console.log(`   - Auction phase: ${room.auctionPhase}`);
+            
             const tradeResult = room.offerTrade(socket.id, targetPlayerId);
             
+            // Send confirmation to initiating player
             socket.emit('tradeOfferSent', {
                 targetPlayerName: tradeResult.toPlayerName,
                 yourChampion: tradeResult.fromChampion.name,
                 theirChampion: tradeResult.toChampion.name
             });
             
-            // Send trade request to the target player
-            const targetSocket = room.players.get(targetPlayerId).socket;
+            // Find target player socket - with multiple fallback methods
+            const targetPlayer = room.players.get(targetPlayerId);
+            if (!targetPlayer) {
+                throw new Error('Target player not found in room');
+            }
+            
+            let targetSocket = targetPlayer.socket;
+            
+            // Fallback 1: Check if socket is still connected
+            if (!targetSocket || !targetSocket.connected) {
+                console.log(`⚠️ Target socket not connected, searching by ID...`);
+                
+                // Fallback 2: Find socket by ID in all connected sockets
+                const allSockets = io.sockets.sockets;
+                targetSocket = allSockets.get(targetPlayerId);
+                
+                if (targetSocket) {
+                    console.log(`✅ Found target socket via ID lookup`);
+                    targetPlayer.socket = targetSocket; // Update reference
+                }
+            }
+            
+            if (!targetSocket || !targetSocket.connected) {
+                throw new Error('Target player is not connected');
+            }
+            
+            // Send trade request to target player
+            console.log(`📤 Sending trade offer to ${tradeResult.toPlayerName} (${targetPlayerId})`);
             targetSocket.emit('tradeOffer', {
                 fromPlayer: tradeResult.fromPlayerName,
                 fromChampion: tradeResult.fromChampion,
                 toChampion: tradeResult.toChampion
             });
             
-            console.log(`Trade offer sent from ${tradeResult.fromPlayerName} to ${tradeResult.toPlayerName}`);
+            console.log(`✅ Trade offer sent from ${tradeResult.fromPlayerName} to ${tradeResult.toPlayerName}`);
             
         } catch (error) {
-            console.error('Trade offer error:', error);
+            console.error('❌ Trade offer error:', error);
             socket.emit('error', error.message);
         }
     });

@@ -42,11 +42,14 @@
             <div class="reroll-settings" id="rerollSettings">
                 <h4>Game Settings (Host Only)</h4>
                 <div class="setting-group">
-                    <label for="rerollTokens">Reroll Tokens per Player:</label>
-                    <div class="slider-container">
-                        <input type="range" id="rerollTokens" min="1" max="5" value="2" class="reroll-slider">
-                        <span id="rerollValue">2</span>
-                    </div>
+                    <label for="draftMode">Draft Mode:</label>
+                    <select id="draftMode" class="input-field">
+                        <option value="aram">Classic ARAM (Rerolls)</option>
+                        <option value="two-card-pick">Two Card Pick</option>
+                        <option value="memory-pick">Memory Pick (5 Cards)</option>
+                        <option value="auction">Auction Mode (Bidding)</option>
+                    </select>
+                    <small id="draftModeDescription">Random champion with reroll tokens</small>
                 </div>
             </div>
             
@@ -85,6 +88,183 @@
             <div class="team-side red">
                 <h3 style="text-align: center; margin-bottom: 15px; color: #d9534f;">Red Team</h3>
                 <div id="redTeam"></div>
+            </div>
+        </div>
+
+        <div id="cardPickSection" class="card-pick-section hidden">
+            <div class="card-pick-header">
+                <h3>Choose Your Champion</h3>
+                <p>Hover over the cards to reveal them, then select one. The other will go to your team bench.</p>
+            </div>
+            
+            <div class="card-options">
+                <div class="champion-card-option" id="cardOption0">
+                    <div class="card-inner">
+                        <div class="card-back">
+                            <div class="card-question">?</div>
+                        </div>
+                        <div class="card-front">
+                            <img class="card-champion-image" src="" alt="">
+                            <div class="card-champion-name"></div>
+                            <button class="pick-card-btn" onclick="pickCard(0)">Pick This Champion</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="champion-card-option" id="cardOption1">
+                    <div class="card-inner">
+                        <div class="card-back">
+                            <div class="card-question">?</div>
+                        </div>
+                        <div class="card-front">
+                            <img class="card-champion-image" src="" alt="">
+                            <div class="card-champion-name"></div>
+                            <button class="pick-card-btn" onclick="pickCard(1)">Pick This Champion</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="memoryPickSection" class="memory-pick-section hidden">
+            <div class="memory-pick-header">
+                <h3 id="memoryPhaseTitle">Memorize Your Champions</h3>
+                <p id="memoryPhaseDescription">Study these 5 champions carefully - they will be shuffled!</p>
+                <div id="memoryTimer" class="memory-timer">5</div>
+            </div>
+            
+            <div class="memory-cards-container">
+                <div class="memory-card" id="memoryCard0">
+                    <div class="memory-card-inner">
+                        <div class="memory-card-front">
+                            <img class="memory-champion-image" src="" alt="">
+                            <div class="memory-champion-name"></div>
+                        </div>
+                        <div class="memory-card-back">
+                            <div class="memory-card-question">?</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="memory-card" id="memoryCard1">
+                    <div class="memory-card-inner">
+                        <div class="memory-card-front">
+                            <img class="memory-champion-image" src="" alt="">
+                            <div class="memory-champion-name"></div>
+                        </div>
+                        <div class="memory-card-back">
+                            <div class="memory-card-question">?</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="memory-card" id="memoryCard2">
+                    <div class="memory-card-inner">
+                        <div class="memory-card-front">
+                            <img class="memory-champion-image" src="" alt="">
+                            <div class="memory-champion-name"></div>
+                        </div>
+                        <div class="memory-card-back">
+                            <div class="memory-card-question">?</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="memory-card" id="memoryCard3">
+                    <div class="memory-card-inner">
+                        <div class="memory-card-front">
+                            <img class="memory-champion-image" src="" alt="">
+                            <div class="memory-champion-name"></div>
+                        </div>
+                        <div class="memory-card-back">
+                            <div class="memory-card-question">?</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="memory-card" id="memoryCard4">
+                    <div class="memory-card-inner">
+                        <div class="memory-card-front">
+                            <img class="memory-champion-image" src="" alt="">
+                            <div class="memory-champion-name"></div>
+                        </div>
+                        <div class="memory-card-back">
+                            <div class="memory-card-question">?</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="memory-champions-list" id="memoryChampionsList">
+                <h4>Your 5 Champions:</h4>
+                <div class="champions-reminder" id="championsReminder"></div>
+            </div>
+        </div>
+
+        <div id="auctionSection" class="auction-section hidden">
+            <div class="auction-header">
+                <h3 id="auctionTitle">Auction Phase</h3>
+                <div class="auction-progress">
+                    <span id="auctionProgress">Champion 1 of 10</span>
+                </div>
+            </div>
+            
+            <div class="current-auction" id="currentAuction">
+                <div class="auction-champion">
+                    <img id="auctionChampionImage" class="auction-champion-image" src="" alt="">
+                    <h4 id="auctionChampionName">Champion Name</h4>
+                </div>
+                
+                <div class="auction-timer-section">
+                    <div class="auction-timer" id="auctionTimer">20</div>
+                    <p>seconds remaining</p>
+                </div>
+                
+                <div class="bidding-section">
+                    <div class="team-bids">
+                        <div class="team-bid blue-bid">
+                            <h5>Blue Team Bid</h5>
+                            <div class="bid-amount" id="blueBidAmount">0</div>
+                            <div class="bid-coins">coins</div>
+                        </div>
+                        
+                        <div class="team-bid red-bid">
+                            <h5>Red Team Bid</h5>
+                            <div class="bid-amount" id="redBidAmount">0</div>
+                            <div class="bid-coins">coins</div>
+                        </div>
+                    </div>
+                    
+                    <div class="your-bid-section" id="yourBidSection">
+                        <div class="coins-info">
+                            <span>Your coins: <strong id="yourCoins">20</strong></span>
+                            <span>Team coins: <strong id="teamCoins">40</strong></span>
+                        </div>
+                        
+                        <div class="bid-input-section">
+                            <input type="number" id="bidInput" class="bid-input" min="1" max="20" placeholder="Enter bid">
+                            <button id="placeBidBtn" class="place-bid-btn">Place Bid</button>
+                        </div>
+                        
+                        <div class="bid-shortcuts">
+                            <button class="bid-shortcut" onclick="setBidAmount(1)">1</button>
+                            <button class="bid-shortcut" onclick="setBidAmount(5)">5</button>
+                            <button class="bid-shortcut" onclick="setBidAmount(10)">10</button>
+                            <button class="bid-shortcut" onclick="setBidAmount('all')">All In</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="auction-results" id="auctionResults">
+                <h4>Auction Results</h4>
+                <div class="results-list" id="resultsList"></div>
+            </div>
+            
+            <div class="auction-completed" id="auctionCompleted" style="display: none;">
+                <h3>Auction Complete!</h3>
+                <p>All champions have been auctioned. You can now trade with your teammates.</p>
+                <button id="proceedToGameBtn" class="menu-button">Proceed to Game</button>
             </div>
         </div>
 
