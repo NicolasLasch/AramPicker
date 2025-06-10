@@ -681,10 +681,123 @@ body::before {
     border-radius: 14px;
 }
 
+/* Memory Card Shuffle */
+
+/* REPLACE the existing shuffle animation around line 500 with this: */
+
 .memory-card.shuffling {
-    transition: all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    transition: none !important;
+    animation: center-stack-shuffle 6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     z-index: 10;
 }
+
+/* Complex 6-second center-stack shuffle animation */
+@keyframes center-stack-shuffle {
+    0% {
+        transform: translateX(0) translateY(0) rotate(0deg) scale(1);
+    }
+    
+    /* All cards move to center and stack */
+    15% {
+        transform: translateX(-50%) translateY(-50%) rotate(180deg) scale(0.9);
+    }
+    
+    /* Cards are stacked in center */
+    20% {
+        transform: translateX(-50%) translateY(-50%) rotate(360deg) scale(0.8);
+    }
+    
+    /* Start chaotic movement in center area */
+    25% {
+        transform: translateX(calc(-50% + 80px)) translateY(calc(-50% + 60px)) rotate(270deg) scale(0.9);
+    }
+    
+    30% {
+        transform: translateX(calc(-50% - 100px)) translateY(calc(-50% - 40px)) rotate(-180deg) scale(1.1);
+    }
+    
+    35% {
+        transform: translateX(calc(-50% + 120px)) translateY(calc(-50% - 80px)) rotate(450deg) scale(0.7);
+    }
+    
+    40% {
+        transform: translateX(calc(-50% - 60px)) translateY(calc(-50% + 100px)) rotate(-270deg) scale(1.2);
+    }
+    
+    45% {
+        transform: translateX(calc(-50% + 40px)) translateY(calc(-50% - 120px)) rotate(540deg) scale(0.8);
+    }
+    
+    50% {
+        transform: translateX(calc(-50% - 140px)) translateY(calc(-50% + 30px)) rotate(-360deg) scale(1.0);
+    }
+    
+    55% {
+        transform: translateX(calc(-50% + 90px)) translateY(calc(-50% + 110px)) rotate(720deg) scale(0.9);
+    }
+    
+    60% {
+        transform: translateX(calc(-50% - 30px)) translateY(calc(-50% - 100px)) rotate(-450deg) scale(1.1);
+    }
+    
+    65% {
+        transform: translateX(calc(-50% + 110px)) translateY(calc(-50% + 70px)) rotate(630deg) scale(0.8);
+    }
+    
+    70% {
+        transform: translateX(calc(-50% - 80px)) translateY(calc(-50% - 60px)) rotate(-540deg) scale(1.0);
+    }
+    
+    /* Final chaotic movements */
+    75% {
+        transform: translateX(calc(-50% + 60px)) translateY(calc(-50% + 90px)) rotate(810deg) scale(0.9);
+    }
+    
+    80% {
+        transform: translateX(calc(-50% - 50px)) translateY(calc(-50% - 80px)) rotate(-630deg) scale(1.1);
+    }
+    
+    /* Stack again in center before returning */
+    85% {
+        transform: translateX(-50%) translateY(-50%) rotate(1080deg) scale(0.8);
+    }
+    
+    90% {
+        transform: translateX(-50%) translateY(-50%) rotate(1260deg) scale(0.9);
+    }
+    
+    /* Return to original position */
+    95% {
+        transform: translateX(0) translateY(0) rotate(1440deg) scale(1.05);
+    }
+    
+    100% {
+        transform: translateX(0) translateY(0) rotate(0deg) scale(1);
+    }
+}
+
+/* Add different delays for each card to create stacking effect */
+.memory-card:nth-child(1).shuffling {
+    animation-delay: 0s;
+}
+
+.memory-card:nth-child(2).shuffling {
+    animation-delay: 0.1s;
+}
+
+.memory-card:nth-child(3).shuffling {
+    animation-delay: 0.2s;
+}
+
+.memory-card:nth-child(4).shuffling {
+    animation-delay: 0.3s;
+}
+
+.memory-card:nth-child(5).shuffling {
+    animation-delay: 0.4s;
+}
+
+/* Memory Card Styles */
 
 .memory-card.picking-enabled {
     cursor: pointer;
