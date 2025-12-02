@@ -214,4 +214,4 @@ node server.js
 
 **Built with**: Node.js, Express, Socket.IO, SQLite, Riot Games API, Vanilla JavaScript, CSS3
 
-**Author**: Nicolas Huart | [Portfolio](https://your-portfolio.com) | [LinkedIn](https://linkedin.com/in/yourprofile)
+**Author**: Nicolas Lasch
